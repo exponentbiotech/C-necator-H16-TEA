@@ -2873,8 +2873,17 @@ def fig_v5_oat_sensitivity(
             low_override = {key: max(1e-9, value * (1.0 - delta))}
             high_override = {key: value * (1.0 + delta)}
 
-        low_r = _fairfield_single_result(phase, base.utilization_pct, scenario, acquisition_cost, added_major_capex, low_override)
-        high_r = _fairfield_single_result(phase, base.utilization_pct, scenario, acquisition_cost, added_major_capex, high_override)
+        low_case_overrides = dict(base_overrides)
+        low_case_overrides.update(low_override)
+        high_case_overrides = dict(base_overrides)
+        high_case_overrides.update(high_override)
+
+        low_r = _fairfield_single_result(
+            phase, base.utilization_pct, scenario, acquisition_cost, added_major_capex, low_case_overrides
+        )
+        high_r = _fairfield_single_result(
+            phase, base.utilization_pct, scenario, acquisition_cost, added_major_capex, high_case_overrides
+        )
         labels.append(label)
         low_vals.append(low_r.pha_msp_with_scp_credit)
         high_vals.append(high_r.pha_msp_with_scp_credit)
