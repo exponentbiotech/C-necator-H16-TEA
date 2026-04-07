@@ -2428,8 +2428,8 @@ def _fairfield_guardrail_warnings(
     _check("S2 CDW titer (g/L)", s2_inputs["titer_gL"], 35.0, 80.0, "Values above ~80 g/L move into aggressive high-cell-density territory.")
     _check("S1 biomass yield (kg/kg sugar)", s1_inputs["yield_kg_per_kg_sugar"], 0.40, 0.55)
     _check("S2 biomass yield (kg/kg sugar)", s2_inputs["yield_kg_per_kg_sugar"], 0.42, 0.55)
-    _check("S1 PHB content (% CDW)", s1_inputs["phb_content_frac"] * 100.0, 50.0, 70.0)
-    _check("S2 PHB content (% CDW)", s2_inputs["phb_content_frac"] * 100.0, 55.0, 72.0)
+    _check("S1 PHB content (% CDW)", s1_inputs["phb_content_frac"] * 100.0, 30.0, 72.0)
+    _check("S2 PHB content (% CDW)", s2_inputs["phb_content_frac"] * 100.0, 30.0, 72.0)
     _check("S1 nitrogen reduction (%)", s1_inputs["n_reduction_frac"] * 100.0, 40.0, 60.0)
     _check("S2 nitrogen reduction (%)", s2_inputs["n_reduction_frac"] * 100.0, 65.0, 85.0)
     _check("S1 carbon recovery (%)", s1_inputs["carbon_recovery_frac"] * 100.0, 85.0, 95.0)
@@ -3200,27 +3200,33 @@ with st.expander("Fairfield Facility + Scenario Basis", expanded=True):
     c1, c2 = st.columns(2)
     with c1:
         st.markdown(
-            f"""
-**Facility** — Former AB InBev brewery, 3101 Busch Drive, Fairfield CA  
-**Installed phases** — 50,000 L / 150,000 L / 400,000 L  
-**Mode** — Continuous, 24 h HRT, **85% uptime locked**  
-**Electricity** — ${electricity_price:.3f}/kWh  
-**Strain** — *C. necator* NCIMB 11599  
-**Acquisition** — ${acquisition_cost/1e6:.1f}M  
-**Added major CapEx** — ${added_major_capex/1e6:.1f}M  
-**Annualized CapEx** — ${(focus.annual_major_capex)/1e6:.2f}M/yr at {discount_rate:.0%}, {npv_years} yr
-"""
+            (
+                f"<div style='line-height:1.7;'>"
+                f"<div><strong>Facility:</strong> Former AB InBev brewery, 3101 Busch Drive, Fairfield CA</div>"
+                f"<div><strong>Installed phases:</strong> 50,000 L / 150,000 L / 400,000 L</div>"
+                f"<div><strong>Mode:</strong> Continuous, 24 h HRT, 85% uptime locked</div>"
+                f"<div><strong>Electricity:</strong> ${electricity_price:.3f}/kWh</div>"
+                f"<div><strong>Strain:</strong> C. necator NCIMB 11599</div>"
+                f"<div><strong>Acquisition:</strong> ${acquisition_cost/1e6:.1f}M</div>"
+                f"<div><strong>Added major CapEx:</strong> ${added_major_capex/1e6:.1f}M</div>"
+                f"<div><strong>Annualized CapEx:</strong> ${(focus.annual_major_capex)/1e6:.2f}M/yr at {discount_rate:.0%}, {npv_years} yr</div>"
+                f"</div>"
+            ),
+            unsafe_allow_html=True,
         )
     with c2:
         st.markdown(
-            f"""
-**Scenario 1** — 100% Jelly Belly COD, yield {s1_yield:.3f} kg/kg, {s1_titer:.1f} g/L, {s1_phb*100:.0f}% PHB, {s1_scp_cp*100:.0f}% SCP CP  
-**Scenario 2** — 70/30 Jelly Belly COD/DLP, yield {s2_yield:.3f} kg/kg, {s2_titer:.1f} g/L, {s2_phb*100:.0f}% PHB, {s2_scp_cp*100:.0f}% SCP CP  
-**SCP target price** — ${scp_target_price:.2f}/kg  
-**PHA revenue price basis** — {phb_share*100:.0f}% PHB @ ${phb_standard_price:.2f}/kg + {(1.0-phb_share)*100:.0f}% PHBV @ ${phbv_price:.2f}/kg = **${common_overrides['pha_blended_price']:.2f}/kg**  
-**SCP credit for PHA MSP** — ${scp_credit_price:.2f}/kg  
-**Scenario 3** — narrative upside only, not modeled in v5
-"""
+            (
+                f"<div style='line-height:1.7;'>"
+                f"<div><strong>Scenario 1:</strong> 100% Jelly Belly COD, yield {s1_yield:.3f} kg/kg, {s1_titer:.1f} g/L, {s1_phb*100:.0f}% PHB, {s1_scp_cp*100:.0f}% SCP CP</div>"
+                f"<div><strong>Scenario 2:</strong> 70/30 Jelly Belly COD/DLP, yield {s2_yield:.3f} kg/kg, {s2_titer:.1f} g/L, {s2_phb*100:.0f}% PHB, {s2_scp_cp*100:.0f}% SCP CP</div>"
+                f"<div><strong>SCP target price:</strong> ${scp_target_price:.2f}/kg</div>"
+                f"<div><strong>PHA revenue price basis:</strong> {phb_share*100:.0f}% PHB @ ${phb_standard_price:.2f}/kg + {(1.0-phb_share)*100:.0f}% PHBV @ ${phbv_price:.2f}/kg = <strong>${common_overrides['pha_blended_price']:.2f}/kg</strong></div>"
+                f"<div><strong>SCP credit for PHA MSP:</strong> ${scp_credit_price:.2f}/kg</div>"
+                f"<div><strong>Scenario 3:</strong> Narrative upside only, not modeled in v5</div>"
+                f"</div>"
+            ),
+            unsafe_allow_html=True,
         )
 
 _section("Selected Operating Point")
