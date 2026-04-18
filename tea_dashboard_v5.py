@@ -2941,6 +2941,282 @@ def fig_v5_oat_sensitivity(
     return fig
 
 
+# ── Break-even analysis figures (live, driven by active sidebar settings) ──
+def _breakeven_decomposition(
+    phase: str,
+    scenario_id: str,
+    base_overrides: Dict[str, float],
+    acquisition_cost: float,
+    added_major_capex: float,
+) -> Dict[str, float]:
+    """Return revenue-per-CDW, variable-per-CDW, fixed labor, and break-even CDW/titer/util
+    using the *active* scenario overrides and phase."""
+    scenario = FAIRFIELD_SCENARIOS[scenario_id]
+    base_r = _fairfield_single_result(
+        phase, 100.0, scenario, acquisition_cost, added_major_capex, base_overrides
+    )
+    cdw = max(1.0, base_r.annual_cdw_kg)
+    variable_cash = (
+        base_r.substrate_cost + base_r.pretreatment_cost + base_r.nitrogen_cost
+        + base_r.electricity_cost + base_r.steam_cost + base_r.extraction_cost
+        + base_r.downstream_cost + base_r.cip_cost
+    )
+    rev_per_cdw = base_r.total_revenue / cdw
+    var_per_cdw = variable_cash / cdw
+    margin_per_cdw = rev_per_cdw - var_per_cdw
+    labor = base_r.labor_cost
+    be_cdw = labor / margin_per_cdw if margin_per_cdw > 1e-9 else float("nan")
+    vessel_L = PHASE_VOLUMES_L[phase]
+    cycles = _annual_operating_cycles()
+    titer = base_r.titer_gL
+    be_titer_at_current_util = (
+        be_cdw / (vessel_L * (base_r.utilization_pct / 100.0) * cycles / 1000.0)
+        if be_cdw == be_cdw else float("nan")
+    )
+    be_util_at_current_titer = (
+        be_cdw / (vessel_L * (titer / 1000.0) * cycles) * 100.0
+        if be_cdw == be_cdw else float("nan")
+    )
+    return {
+        "rev_per_cdw": rev_per_cdw,
+        "var_per_cdw": var_per_cdw,
+        "margin_per_cdw": margin_per_cdw,
+        "labor": labor,
+        "be_cdw_kg": be_cdw,
+        "be_titer_gL": be_titer_at_current_util,
+        "be_util_pct": be_util_at_current_titer,
+        "base_result": base_r,
+    }
+
+
+def fig_v5_waterfall(
+    results: List[FairfieldResult],
+    phase: str,
+    scenario_id: str,
+) -> plt.Figure:
+    """Annual P&L waterfall — revenue minus each cost bucket → cash flow."""
+    r = _fairfield_result(results, phase, scenario_id)
+    rv = r.total_revenue / 1e6
+    feed = (r.substrate_cost + r.pretreatment_cost) / 1e6
+    nit = r.nitrogen_cost / 1e6
+    elec = r.electricity_cost / 1e6
+    stm = r.steam_cost / 1e6
+    ext = r.extraction_cost / 1e6
+    dwn = r.downstream_cost / 1e6
+    cp = r.cip_cost / 1e6
+    lab = r.labor_cost / 1e6
+    cap = r.annual_major_capex / 1e6
+    cf = r.annual_cash_flow / 1e6
+    values = [rv, -feed, -nit, -elec, -stm, -ext, -dwn, -cp, -lab, -cap, cf]
+    labels = [
+        "Revenue\n(PHA+SCP)", "Feedstock &\npretreat", "Nitrogen",
+        "Electricity", "Steam", "Extraction", "Downstream",
+        "CIP / maint.", "Labor", "Annualized\nCapEx", "Cash\nflow",
+    ]
+    colors = ["#059669"] + ["#dc2626"] * 9 + ["#0369a1"]
+    starts: List[float] = []
+    running = 0.0
+    for v in values[:-1]:
+        starts.append(running)
+        running += v
+    starts.append(0.0)
+
+    fig, ax = plt.subplots(figsize=(12.5, 5.8), constrained_layout=True)
+    for i, (val, s) in enumerate(zip(values, starts)):
+        ax.bar(i, val, bottom=s, color=colors[i], edgecolor="white",
+               linewidth=1.2, width=0.72)
+        mid = s + val / 2.0
+        ax.text(i, mid, f"${abs(val):.2f}M", ha="center", va="center",
+                fontsize=9, fontweight="bold",
+                color="white" if abs(val) > 0.35 else "#0f172a")
+    ax.set_xticks(range(len(labels)))
+    ax.set_xticklabels(labels, fontsize=9)
+    ax.set_ylabel("$M/yr", fontsize=11)
+    ax.set_title(
+        f"Annual P&L waterfall — {phase} / {scenario_id} "
+        f"({r.titer_gL:.0f} g/L CDW, {r.utilization_pct:.0f}% utilization)",
+        fontsize=12, color="#0f172a",
+    )
+    ax.axhline(0, color="#0f172a", linewidth=0.8)
+    ax.grid(axis="y", alpha=0.3)
+    return fig
+
+
+def fig_v5_revenue_vs_opex(
+    phase: str,
+    scenario_id: str,
+    base_overrides: Dict[str, float],
+    acquisition_cost: float,
+    added_major_capex: float,
+) -> plt.Figure:
+    """Annual revenue vs annual OpEx as CDW titer sweeps 10–80 g/L at active utilization."""
+    scenario = FAIRFIELD_SCENARIOS[scenario_id]
+    base_r = _fairfield_single_result(
+        phase, base_overrides.get("__util", 100.0), scenario,
+        acquisition_cost, added_major_capex, base_overrides
+    )
+    util = base_r.utilization_pct
+    titers = np.linspace(10.0, 80.0, 141)
+    revs: List[float] = []
+    opxs: List[float] = []
+    for t in titers:
+        ov = dict(base_overrides)
+        ov["titer_gL"] = float(t)
+        r = _fairfield_single_result(
+            phase, util, scenario, acquisition_cost, added_major_capex, ov
+        )
+        cash_opex = r.total_annual_cost - r.annual_major_capex
+        revs.append(r.total_revenue / 1e6)
+        opxs.append(cash_opex / 1e6)
+    info = _breakeven_decomposition(
+        phase, scenario_id, base_overrides, acquisition_cost, added_major_capex
+    )
+    be_titer = info["be_titer_gL"]
+
+    fig, ax = plt.subplots(figsize=(11.5, 5.4), constrained_layout=True)
+    ax.plot(titers, revs, color="#059669", linewidth=2.8, label="Annual revenue")
+    ax.plot(titers, opxs, color="#dc2626", linewidth=2.8, label="Annual cash OpEx")
+    ax.fill_between(titers, revs, opxs,
+                    where=(np.array(revs) > np.array(opxs)),
+                    color="#bbf7d0", alpha=0.5, label="Profit zone")
+    ax.fill_between(titers, revs, opxs,
+                    where=(np.array(revs) <= np.array(opxs)),
+                    color="#fecaca", alpha=0.5, label="Loss zone")
+    if be_titer == be_titer and 10.0 <= be_titer <= 80.0:
+        ax.axvline(be_titer, color="#0f172a", linewidth=1.2, linestyle=":")
+        ax.text(be_titer + 0.8, min(revs) + 0.1 * (max(revs) - min(revs)),
+                f"Break-even\n{be_titer:.1f} g/L",
+                color="#0f172a", fontsize=10, fontweight="bold")
+    ax.set_xlabel("CDW titer (g/L)", fontsize=11)
+    ax.set_ylabel("$M/yr", fontsize=11)
+    ax.set_title(
+        f"Annual revenue vs. cash OpEx — {phase} / {scenario_id}, "
+        f"{util:.0f}% utilization",
+        fontsize=12, color="#0f172a",
+    )
+    ax.grid(alpha=0.25)
+    ax.legend(loc="upper left", fontsize=9)
+    return fig
+
+
+def fig_v5_breakeven_titer(
+    phase: str,
+    scenario_id: str,
+    base_overrides: Dict[str, float],
+    acquisition_cost: float,
+    added_major_capex: float,
+) -> plt.Figure:
+    """Annual cash flow as CDW titer sweeps from 0 to 80 g/L at active utilization."""
+    scenario = FAIRFIELD_SCENARIOS[scenario_id]
+    base_r = _fairfield_single_result(
+        phase, 100.0, scenario, acquisition_cost, added_major_capex, base_overrides
+    )
+    util = base_r.utilization_pct
+    active_titer = base_r.titer_gL
+    titers = np.linspace(0.0, 80.0, 161)
+    cfs: List[float] = []
+    for t in titers:
+        ov = dict(base_overrides)
+        ov["titer_gL"] = float(t)
+        r = _fairfield_single_result(
+            phase, util, scenario, acquisition_cost, added_major_capex, ov
+        )
+        cfs.append(r.annual_cash_flow / 1e6)
+    info = _breakeven_decomposition(
+        phase, scenario_id, base_overrides, acquisition_cost, added_major_capex
+    )
+    be_titer = info["be_titer_gL"]
+
+    fig, ax = plt.subplots(figsize=(11.5, 5.4), constrained_layout=True)
+    arr = np.array(cfs)
+    ax.plot(titers, cfs, color="#0e746f", linewidth=2.8)
+    ax.axhline(0, color="#64748b", linewidth=1, linestyle="--")
+    ax.fill_between(titers, cfs, 0, where=(arr < 0),
+                    color="#fecaca", alpha=0.55, label="Negative cash flow")
+    ax.fill_between(titers, cfs, 0, where=(arr >= 0),
+                    color="#bbf7d0", alpha=0.55, label="Positive cash flow")
+    if be_titer == be_titer and 0.0 <= be_titer <= 80.0:
+        ax.axvline(be_titer, color="#ef4444", linewidth=1.5, linestyle=":")
+        ax.text(be_titer + 1.0, arr.min() * 0.55,
+                f"Cash break-even\n{be_titer:.1f} g/L",
+                color="#ef4444", fontsize=10, fontweight="bold")
+    if 0.0 <= active_titer <= 80.0:
+        ax.axvline(active_titer, color="#0f172a", linewidth=1.2, alpha=0.7)
+        ax.text(active_titer, arr.max() * 0.85,
+                f"Active\n{active_titer:.1f} g/L",
+                ha="center", color="#0f172a", fontsize=9, fontweight="bold",
+                bbox=dict(boxstyle="round,pad=0.25", fc="#f1f5f9", ec="#cbd5e1"))
+    ax.set_xlabel("CDW titer (g/L)", fontsize=11)
+    ax.set_ylabel("Annual cash flow ($M/yr)", fontsize=11)
+    ax.set_title(
+        f"Cash flow sensitivity to CDW titer — {phase} / {scenario_id}, "
+        f"{util:.0f}% utilization",
+        fontsize=12, color="#0f172a",
+    )
+    ax.grid(alpha=0.25)
+    ax.set_xlim(0, 80)
+    ax.legend(loc="upper left", fontsize=9)
+    return fig
+
+
+def fig_v5_breakeven_util(
+    phase: str,
+    scenario_id: str,
+    base_overrides: Dict[str, float],
+    acquisition_cost: float,
+    added_major_capex: float,
+) -> plt.Figure:
+    """Annual cash flow as utilization sweeps from 0 to 100% at active CDW titer."""
+    scenario = FAIRFIELD_SCENARIOS[scenario_id]
+    base_r = _fairfield_single_result(
+        phase, 100.0, scenario, acquisition_cost, added_major_capex, base_overrides
+    )
+    active_util = base_r.utilization_pct
+    utils = np.linspace(0.0, 100.0, 101)
+    cfs: List[float] = []
+    for u in utils:
+        r = _fairfield_single_result(
+            phase, float(u), scenario, acquisition_cost, added_major_capex, base_overrides
+        )
+        cfs.append(r.annual_cash_flow / 1e6)
+    info = _breakeven_decomposition(
+        phase, scenario_id, base_overrides, acquisition_cost, added_major_capex
+    )
+    be_util = info["be_util_pct"]
+
+    fig, ax = plt.subplots(figsize=(11.5, 5.4), constrained_layout=True)
+    arr = np.array(cfs)
+    ax.plot(utils, cfs, color="#0369a1", linewidth=2.8)
+    ax.axhline(0, color="#64748b", linewidth=1, linestyle="--")
+    ax.fill_between(utils, cfs, 0, where=(arr < 0),
+                    color="#fecaca", alpha=0.55, label="Negative cash flow")
+    ax.fill_between(utils, cfs, 0, where=(arr >= 0),
+                    color="#bbf7d0", alpha=0.55, label="Positive cash flow")
+    if be_util == be_util and 0.0 <= be_util <= 100.0:
+        ax.axvline(be_util, color="#ef4444", linewidth=1.5, linestyle=":")
+        ax.text(be_util + 1.0, arr.min() * 0.55,
+                f"Cash break-even\n{be_util:.1f}%",
+                color="#ef4444", fontsize=10, fontweight="bold")
+    if 0.0 <= active_util <= 100.0:
+        ax.axvline(active_util, color="#0f172a", linewidth=1.2, alpha=0.7)
+        ax.text(active_util, arr.max() * 0.85,
+                f"Active\n{active_util:.0f}%",
+                ha="center", color="#0f172a", fontsize=9, fontweight="bold",
+                bbox=dict(boxstyle="round,pad=0.25", fc="#f1f5f9", ec="#cbd5e1"))
+    ax.set_xlabel(f"Utilization of {PHASE_VOLUMES_L[phase]:,.0f} L installed volume (%)",
+                  fontsize=11)
+    ax.set_ylabel("Annual cash flow ($M/yr)", fontsize=11)
+    ax.set_title(
+        f"Cash flow sensitivity to utilization — {phase} / {scenario_id}, "
+        f"{base_r.titer_gL:.0f} g/L CDW",
+        fontsize=12, color="#0f172a",
+    )
+    ax.grid(alpha=0.25)
+    ax.set_xlim(0, 100)
+    ax.legend(loc="upper left", fontsize=9)
+    return fig
+
+
 V5_FIGURE_FORMULAS: Dict[str, str] = {
     "Phase Output": (
         "This figure is built in 4 steps.\n\n"
@@ -3326,6 +3602,78 @@ fig = fig_opts[sel_fig]()
 st.pyplot(fig, use_container_width=True)
 plt.close(fig)
 st.markdown("</div>", unsafe_allow_html=True)
+
+_section("Break-Even Analysis")
+_be_info = _breakeven_decomposition(
+    focus_phase, focus_scenario_id, base_overrides_by_scenario[focus_scenario_id],
+    acquisition_cost, added_major_capex,
+)
+_be_base = _be_info["base_result"]
+_be_cdw_tpy = _be_info["be_cdw_kg"] / 1000.0 if _be_info["be_cdw_kg"] == _be_info["be_cdw_kg"] else float("nan")
+_active_cdw_tpy = _be_base.annual_cdw_tpy
+_margin_of_safety = (
+    (_active_cdw_tpy - _be_cdw_tpy) / _active_cdw_tpy * 100.0
+    if _active_cdw_tpy > 0 and _be_cdw_tpy == _be_cdw_tpy else float("nan")
+)
+st.info(
+    f"At active settings ({focus_phase} / {focus_scenario_id}, {_be_base.titer_gL:.1f} g/L CDW, "
+    f"{_be_base.utilization_pct:.0f}% utilization), each kg of CDW generates "
+    f"${_be_info['rev_per_cdw']:.2f} of revenue against ${_be_info['var_per_cdw']:.2f} of variable cost, "
+    f"for a contribution margin of ${_be_info['margin_per_cdw']:.2f}/kg. "
+    f"Fixed labor is ${_be_info['labor']/1e6:.2f}M/yr. "
+    f"Cash break-even requires {_be_cdw_tpy:,.0f} t/y CDW "
+    f"(≈ {_be_info['be_titer_gL']:.1f} g/L at current utilization, or "
+    f"{_be_info['be_util_pct']:.1f}% utilization at current titer). "
+    f"Active case produces {_active_cdw_tpy:,.0f} t/y — a {_margin_of_safety:.0f}% margin of safety."
+)
+be_tab_names = ["P&L Waterfall", "Revenue vs OpEx", "Cash flow vs Titer", "Cash flow vs Utilization"]
+be_tabs = st.tabs(be_tab_names)
+with be_tabs[0]:
+    st.caption(
+        "Annual P&L decomposition at the current focus phase and scenario. "
+        "Green = revenue; red = cost buckets; blue = residual annual cash flow. "
+        "Updates live with sidebar changes."
+    )
+    _fig_be = fig_v5_waterfall(results, focus_phase, focus_scenario_id)
+    st.pyplot(_fig_be, use_container_width=True)
+    plt.close(_fig_be)
+with be_tabs[1]:
+    st.caption(
+        "Annual revenue vs. annual cash OpEx as CDW titer sweeps 10–80 g/L, holding all other "
+        "active settings constant. The crossover is the titer at which revenue exactly covers "
+        "cash operating costs."
+    )
+    _fig_be = fig_v5_revenue_vs_opex(
+        focus_phase, focus_scenario_id,
+        base_overrides_by_scenario[focus_scenario_id],
+        acquisition_cost, added_major_capex,
+    )
+    st.pyplot(_fig_be, use_container_width=True)
+    plt.close(_fig_be)
+with be_tabs[2]:
+    st.caption(
+        "Annual cash flow as CDW titer sweeps 0–80 g/L, at the currently selected utilization. "
+        "Dotted red line is cash break-even; the dark line marks the active titer."
+    )
+    _fig_be = fig_v5_breakeven_titer(
+        focus_phase, focus_scenario_id,
+        base_overrides_by_scenario[focus_scenario_id],
+        acquisition_cost, added_major_capex,
+    )
+    st.pyplot(_fig_be, use_container_width=True)
+    plt.close(_fig_be)
+with be_tabs[3]:
+    st.caption(
+        "Annual cash flow as utilization sweeps 0–100%, at the currently selected CDW titer. "
+        "Dotted red line is cash break-even; the dark line marks the active utilization."
+    )
+    _fig_be = fig_v5_breakeven_util(
+        focus_phase, focus_scenario_id,
+        base_overrides_by_scenario[focus_scenario_id],
+        acquisition_cost, added_major_capex,
+    )
+    st.pyplot(_fig_be, use_container_width=True)
+    plt.close(_fig_be)
 
 _section("Reference Trace")
 st.markdown("- `Fairfield_TEA_v7_Final.pdf`: primary locked Fairfield handoff used for facility, phase sizes, continuous-mode assumptions, Scenario 1 and 2 definitions, and target pricing.")
