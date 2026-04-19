@@ -4,14 +4,16 @@ Leatherback Fairfield TEA Dashboard — v6
 ========================================
 Dedicated Fairfield model built from the April 2026 site handoff and PDF.
 
-v6 changes vs. v5 (Apr 15 2026):
+v6 changes vs. v5 (Apr 15–16 2026):
   - SCP feed-grade market price corrected from $0.46/kg → $1.80/kg default, with
     slider widened to $0.30–$8.00/kg. The old $0.46 value was a commodity soybean-
     meal floor that sat below the model's own MSP; it did not reflect feed-grade
     SCP market benchmarks (fishmeal $1.45–1.80/kg, Calysta FeedKind $1.50–2.00/kg,
     Unibio UniProtein ~$2/kg).
   - New scenario S3_HGP: human-grade (food-grade) protein from the same
-    C. necator NCIMB 11599 biomass. Zero-PHB (all biomass to protein),
+    C. necator NCIMB 11599 biomass, now at 60 g/L under defined food-grade media
+    (a v6.1 bump from the initial 35 g/L assumption, consistent with commercial
+    mycoprotein fermentation protocols). Zero-PHB (all biomass to protein),
     lower downstream recovery (0.70 vs 0.85), +$0.80/kg CDW food-grade DSP
     premium (nucleic acid reduction, allergen-free lines, GMP finishing),
     default market price $5.00/kg (mycoprotein / Solein range).
@@ -2263,21 +2265,27 @@ FAIRFIELD_SCENARIOS: Dict[str, FairfieldScenario] = {
     ),
     "S3_HGP": FairfieldScenario(
         id="S3_HGP",
-        title="Scenario 3 — Human-grade protein (Jelly Belly COD)",
-        carbon_mix_label="100% Jelly Belly COD + invertase (food-grade finishing)",
+        title="Scenario 3 — Human-grade protein (Jelly Belly COD, 60 g/L)",
+        carbon_mix_label="100% Jelly Belly COD + invertase + food-grade defined media",
         jb_share=1.0,
         dlp_share=0.0,
         yield_kg_per_kg_sugar=0.50,
-        titer_gL=35.0,
+        titer_gL=60.0,                              # v6.1: bumped from 35 g/L to match
+                                                    # S2 biomass productivity under a
+                                                    # food-grade defined-media protocol
+                                                    # (supplemented N + trace minerals),
+                                                    # as is standard for commercial
+                                                    # mycoprotein manufacturing.
         phb_content_frac=0.0,                       # zero PHB — all biomass to HGP
         scp_protein_frac=0.70,                      # 68–75 % CP in the literature
         n_reduction_frac=0.50,
         carbon_recovery_frac=0.90,
         notes=(
-            "Food-grade (GRAS) C. necator NCIMB 11599 biomass. Zero-PHB campaign. "
-            "Lower downstream recovery (0.70 vs 0.85) from nucleic-acid reduction, "
-            "allergen-free lines, and GMP finishing. Adds ~$0.80/kg CDW food-grade "
-            "DSP premium. Sells into mycoprotein / Solein comparable $3–10/kg range."
+            "Food-grade (GRAS) C. necator NCIMB 11599 biomass, 60 g/L CDW under "
+            "defined food-grade media. Zero-PHB campaign. Lower downstream recovery "
+            "(0.70 vs 0.85) from nucleic-acid reduction, allergen-free lines, and GMP "
+            "finishing. Adds ~$0.80/kg CDW food-grade DSP premium. Sells into "
+            "mycoprotein / Solein comparable $3–10/kg range."
         ),
         product_grade="human",
         scp_recovery_frac=HGP_SCP_RECOVERY,
@@ -3639,7 +3647,7 @@ with st.expander("Fairfield Facility + Scenario Basis", expanded=True):
                 f"<div style='line-height:1.7;'>"
                 f"<div><strong>S1:</strong> 100% Jelly Belly COD, yield {s1_yield:.3f} kg/kg, {s1_titer:.1f} g/L, {s1_phb*100:.0f}% PHB, {s1_scp_cp*100:.0f}% SCP CP</div>"
                 f"<div><strong>S2:</strong> 70/30 Jelly Belly COD/DLP, yield {s2_yield:.3f} kg/kg, {s2_titer:.1f} g/L, {s2_phb*100:.0f}% PHB, {s2_scp_cp*100:.0f}% SCP CP</div>"
-                f"<div><strong>S3_HGP:</strong> 100% Jelly Belly COD, yield 0.500 kg/kg, 35.0 g/L, 0% PHB, 70% HGP CP, food-grade DSP (+$0.80/kg CDW, 0.70 recovery)</div>"
+                f"<div><strong>S3_HGP:</strong> 100% Jelly Belly COD + food-grade defined media, yield 0.500 kg/kg, 60.0 g/L, 0% PHB, 70% HGP CP, food-grade DSP (+$0.80/kg CDW, 0.70 recovery)</div>"
                 f"<div><strong>Feed-grade SCP market price (S1, S2):</strong> ${scp_target_price:.2f}/kg <em>(benchmark fishmeal $1.45–1.80/kg; Calysta $1.50–2.00/kg)</em></div>"
                 f"<div><strong>HGP market price (S3_HGP):</strong> ${hgp_target_price:.2f}/kg <em>(benchmark mycoprotein $3–5/kg; Solein target $5–10/kg)</em></div>"
                 f"<div><strong>PHA revenue price basis:</strong> {phb_share*100:.0f}% PHB @ ${phb_standard_price:.2f}/kg + {(1.0-phb_share)*100:.0f}% PHBV @ ${phbv_price:.2f}/kg = <strong>${common_overrides['pha_blended_price']:.2f}/kg</strong></div>"
