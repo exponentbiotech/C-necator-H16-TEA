@@ -31,11 +31,11 @@ Revision history:
        can both be examined.
 
        v7 also locks both modeled scenarios to a shared biology base case:
-       60 g/L CDW titer and 50% PHB content. The earlier v5/v6 S1 design-
+       60 g/L CDW titer and 60% PHB content. The earlier v5/v6 S1 design-
        basis titer of 35 g/L ("conservative Year 1") has been retired in
        favor of a single-anchor 60 g/L base across S1 and S2, and the
        earlier PHB split (S1 60% / S2 40%) has been retired in favor of a
-       single-anchor 50% PHB across both scenarios. The practical effect
+       single-anchor 60% PHB across both scenarios. The practical effect
        is that S1 and S2 now produce the same PHA and SCP tonnage by
        construction; they are differentiated only by cost-side biology
        (nitrogen reduction intensity, carbon recovery, feedstock mix),
@@ -2258,11 +2258,11 @@ FAIRFIELD_SCENARIOS: Dict[str, FairfieldScenario] = {
         dlp_share=0.0,
         yield_kg_per_kg_sugar=0.50,
         titer_gL=60.0,
-        phb_content_frac=0.50,
+        phb_content_frac=0.60,
         scp_protein_frac=0.68,
         n_reduction_frac=0.50,
         carbon_recovery_frac=0.90,
-        notes="NCIMB 11599, continuous 24 h HRT, 60 g/L CDW / 50% PHB base case (v7 lock). "
+        notes="NCIMB 11599, continuous 24 h HRT, 60 g/L CDW / 60% PHB base case (v7 lock). "
               "S1 is the JB-only feed scenario. Product slate (PHA / SCP tonnage) is "
               "identical to S2 by construction; S1 and S2 differ on the cost-side "
               "biology (S1: 50% N-reduction, 90% C-recovery, 100% JB carbon mix).",
@@ -2275,11 +2275,11 @@ FAIRFIELD_SCENARIOS: Dict[str, FairfieldScenario] = {
         dlp_share=0.30,
         yield_kg_per_kg_sugar=0.496,
         titer_gL=60.0,
-        phb_content_frac=0.50,
+        phb_content_frac=0.60,
         scp_protein_frac=0.60,
         n_reduction_frac=0.75,
         carbon_recovery_frac=0.92,
-        notes="60 g/L CDW / 50% PHB base case (v7 lock). S2 is the 70/30 JB/DLP "
+        notes="60 g/L CDW / 60% PHB base case (v7 lock). S2 is the 70/30 JB/DLP "
               "blended-feed scenario. Product slate (PHA / SCP tonnage) is "
               "identical to S1 by construction; S1 and S2 differ on the cost-side "
               "biology (S2: 75% N-reduction, 92% C-recovery, 30% DLP carbon mix "
@@ -3383,7 +3383,7 @@ _require_app_password()
 st.title("Leatherback Fairfield TEA Dashboard v7")
 st.caption(
     "Dedicated Fairfield dashboard | AB InBev Fairfield brewery | continuous 24 h HRT | "
-    "Scenarios 1 and 2 only | NCIMB 11599 | 60 g/L CDW, 50% PHB base case locked (v7)"
+    "Scenarios 1 and 2 only | NCIMB 11599 | 60 g/L CDW, 60% PHB base case locked (v7)"
 )
 
 _sb_hdr("Focus View")
@@ -3437,7 +3437,7 @@ added_major_capex = (
 
 _sb_hdr("Scenario 1 Inputs")
 st.sidebar.caption(
-    "S1 base case locked at 60 g/L CDW, 50% PHB content, 50% nitrogen reduction, "
+    "S1 base case locked at 60 g/L CDW, 60% PHB content, 50% nitrogen reduction, "
     "100% Jelly Belly COD feed. S1 and S2 now share identical titer and PHB "
     "content by construction; they differ only on cost-side biology "
     "(nitrogen reduction, carbon recovery, feedstock mix). Drag titer down "
@@ -3445,20 +3445,20 @@ st.sidebar.caption(
 )
 s1_titer = st.sidebar.slider("S1 CDW titer (g/L)", 10.0, 120.0, 60.0, 1.0, key="v5_s1_titer")
 s1_yield = st.sidebar.slider("S1 biomass yield (kg CDW/kg sugar)", 0.20, 0.80, 0.50, 0.01, key="v5_s1_yield")
-s1_phb = st.sidebar.slider("S1 PHB content (% CDW)", 20.0, 85.0, 50.0, 1.0, key="v5_s1_phb") / 100.0
+s1_phb = st.sidebar.slider("S1 PHB content (% CDW)", 20.0, 85.0, 60.0, 1.0, key="v5_s1_phb") / 100.0
 s1_scp_cp = st.sidebar.slider("S1 SCP protein (% CP)", 50.0, 85.0, 68.0, 1.0, key="v5_s1_scp_cp") / 100.0
 s1_n_reduction = st.sidebar.slider("S1 nitrogen reduction (%)", 0.0, 95.0, 50.0, 1.0, key="v5_s1_n_reduction") / 100.0
 s1_carbon_recovery = st.sidebar.slider("S1 carbon recovery (%)", 70.0, 100.0, 90.0, 1.0, key="v5_s1_carbon_recovery") / 100.0
 
 _sb_hdr("Scenario 2 Inputs")
 st.sidebar.caption(
-    "S2 base case locked at 60 g/L CDW, 50% PHB content, 75% nitrogen reduction, "
+    "S2 base case locked at 60 g/L CDW, 60% PHB content, 75% nitrogen reduction, "
     "92% carbon recovery, 70% Jelly Belly COD / 30% DLP feed. Identical product "
     "slate to S1 by construction; differs from S1 on cost-side biology only."
 )
 s2_titer = st.sidebar.slider("S2 CDW titer (g/L)", 10.0, 120.0, 60.0, 1.0, key="v5_s2_titer")
 s2_yield = st.sidebar.slider("S2 biomass yield (kg CDW/kg sugar)", 0.20, 0.80, 0.496, 0.001, key="v5_s2_yield")
-s2_phb = st.sidebar.slider("S2 PHB content (% CDW)", 20.0, 85.0, 50.0, 1.0, key="v5_s2_phb") / 100.0
+s2_phb = st.sidebar.slider("S2 PHB content (% CDW)", 20.0, 85.0, 60.0, 1.0, key="v5_s2_phb") / 100.0
 s2_scp_cp = st.sidebar.slider("S2 SCP protein (% CP)", 45.0, 80.0, 60.0, 1.0, key="v5_s2_scp_cp") / 100.0
 s2_n_reduction = st.sidebar.slider("S2 nitrogen reduction (%)", 0.0, 98.0, 75.0, 1.0, key="v5_s2_n_reduction") / 100.0
 s2_carbon_recovery = st.sidebar.slider("S2 carbon recovery (%)", 70.0, 100.0, 92.0, 1.0, key="v5_s2_carbon_recovery") / 100.0
