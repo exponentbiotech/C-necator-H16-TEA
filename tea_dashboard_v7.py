@@ -28,7 +28,32 @@ Revision history:
        (FRED PFISHUSDM, 2024-2025), Calysta FeedKind, and Unibio UniProtein
        commercial benchmarks. The SCP selling-price slider range is widened
        to $0.30-$8.00/kg so that downside stress tests and specialty upside
-       can both be examined. All other v5 functionality is preserved.
+       can both be examined.
+
+       v7 also locks both modeled scenarios to a 60 g/L CDW base case. The
+       earlier v5/v6 S1 design-basis titer of 35 g/L ("conservative Year 1")
+       has been retired in favor of a single-anchor 60 g/L base across S1
+       and S2 so that (a) the scenario-object defaults match the slider
+       defaults, removing the silent override that was present in v5/v6,
+       and (b) S1 and S2 differ on the biology that actually distinguishes
+       them (PHB fraction, nitrogen-limitation intensity, carbon recovery,
+       feedstock mix) rather than on titer. S1 remains the high-PHB-fraction
+       scenario (60% PHB) and S2 remains the balanced-biomass scenario
+       (40% PHB); both now run at 60 g/L by default. The 35 g/L downside
+       case is still accessible through the titer slider for sensitivity
+       work. All other v5 functionality is preserved.
+
+       v7 also documents two defects identified in the
+       Fairfield_TEA_v7_Final.pdf site handoff document, both on page 7:
+       (1) the $0.46/kg SCP selling-price value was quoted with a fishmeal-
+       parity rationale but numerically anchored to the soybean-meal
+       commodity band (~4x below fishmeal); (2) the stated Phase III annual
+       gross CDW of ~10,700 MT/yr does not match the handoff's own formula
+       (306,000 L x 35 g/L x 8,760/24 / 1e6), which actually evaluates to
+       ~3,909 MT/yr (a 2.74x arithmetic inflation). Defect 1 was transcribed
+       into v5 and is corrected in v7. Defect 2 did not propagate into v5/v7
+       because the TEA computes annual CDW from first principles; it is
+       flagged here for correction at the handoff source.
 
 Run locally:
     cd ~/Downloads
@@ -2230,12 +2255,14 @@ FAIRFIELD_SCENARIOS: Dict[str, FairfieldScenario] = {
         jb_share=1.0,
         dlp_share=0.0,
         yield_kg_per_kg_sugar=0.50,
-        titer_gL=35.0,
+        titer_gL=60.0,
         phb_content_frac=0.60,
         scp_protein_frac=0.68,
         n_reduction_frac=0.50,
         carbon_recovery_frac=0.90,
-        notes="NCIMB 11599, continuous 24 h HRT, conservative Year 1 operation.",
+        notes="NCIMB 11599, continuous 24 h HRT, 60 g/L CDW base case (v7 lock). "
+              "S1 is the high-PHB-fraction scenario on JB-only feed; differentiated "
+              "from S2 by 60% PHB content, 50% N-reduction, and 100% JB carbon mix.",
     ),
     "S2": FairfieldScenario(
         id="S2",
@@ -2249,7 +2276,10 @@ FAIRFIELD_SCENARIOS: Dict[str, FairfieldScenario] = {
         scp_protein_frac=0.60,
         n_reduction_frac=0.75,
         carbon_recovery_frac=0.92,
-        notes="PHB-priority campaign; DLP fraction gets pH/dilution only and 15% galactose uptake penalty.",
+        notes="60 g/L CDW base case (v7 lock). S2 is the balanced-biomass scenario "
+              "on the 70/30 JB/DLP blend; differentiated from S1 by 40% PHB content, "
+              "75% N-reduction, and 30% DLP carbon mix (pH/dilution pretreat only; "
+              "15% galactose uptake penalty applied to the DLP fraction).",
     ),
 }
 
@@ -2457,8 +2487,8 @@ def _fairfield_guardrail_warnings(
     for phase, util in phase_utils.items():
         _check(f"{phase} utilization (%)", util, 20.0, 95.0, "Very low utilization is a ramp case; 100% continuous use is usually too optimistic.")
 
-    _check("S1 CDW titer (g/L)", s1_inputs["titer_gL"], 35.0, 85.0, "Values above ~85 g/L should be treated as stretch assumptions for this conservative first-year case.")
-    _check("S2 CDW titer (g/L)", s2_inputs["titer_gL"], 35.0, 80.0, "Values above ~80 g/L move into aggressive high-cell-density territory.")
+    _check("S1 CDW titer (g/L)", s1_inputs["titer_gL"], 35.0, 85.0, "S1 base case is locked at 60 g/L; 35 g/L reproduces the v5/v6 conservative Year 1 case and >85 g/L should be treated as a stretch assumption.")
+    _check("S2 CDW titer (g/L)", s2_inputs["titer_gL"], 35.0, 85.0, "S2 base case is locked at 60 g/L; values above ~85 g/L move into aggressive high-cell-density territory.")
     _check("S1 biomass yield (kg/kg sugar)", s1_inputs["yield_kg_per_kg_sugar"], 0.40, 0.55)
     _check("S2 biomass yield (kg/kg sugar)", s2_inputs["yield_kg_per_kg_sugar"], 0.42, 0.55)
     _check("S1 PHB content (% CDW)", s1_inputs["phb_content_frac"] * 100.0, 30.0, 72.0)
@@ -3248,8 +3278,13 @@ V5_FIGURE_FORMULAS: Dict[str, str] = {
         "Example: Phase III at 90% utilization uses 400,000 L × 0.90 = 360,000 L of broth volume.\n\n"
         "2. **Annual operating cycles** = 8,760 h/year × 85% uptime ÷ 24 h HRT = 310.25 turnover-equivalents per year.\n\n"
         "3. **Annual CDW** = utilized vessel volume × CDW titer × annual operating cycles.\n"
-        "The titer is 35 g/L for S1 and 45 g/L for S2.\n\n"
-        "For example, Phase III S1 at 90% utilization gives 360,000 L × 35 g/L × 310.25 ÷ 1,000,000 = about 3,909 t/y CDW.\n\n"
+        "The v7 base case is locked at 60 g/L for both S1 and S2 (was 35 g/L for S1 in v5/v6).\n\n"
+        "For example, Phase III S1 at 90% utilization and the 60 g/L v7 base case gives "
+        "360,000 L × 60 g/L × 310.25 ÷ 1,000,000 = about 6,701 t/y CDW. At the v5/v6 "
+        "conservative 35 g/L, the same calculation gives about 3,909 t/y CDW. "
+        "Note: the site handoff (Fairfield_TEA_v7_Final.pdf, page 7) states "
+        "~10,700 t/y for the 35 g/L case, which is arithmetically incorrect — "
+        "the handoff's own formula evaluates to ~3,909 t/y.\n\n"
         "4. **Sellable PHA** = annual CDW × PHB fraction × 0.88 extraction recovery × 0.95 dry basis.\n\n"
         "5. **Sellable SCP** = annual CDW × (1 - PHB fraction) × 0.85 biomass recovery × 0.92 dry basis.\n\n"
         "The stacked bars therefore show final sellable product tonnage, not raw fermentation mass."
@@ -3343,7 +3378,7 @@ _require_app_password()
 st.title("Leatherback Fairfield TEA Dashboard v7")
 st.caption(
     "Dedicated Fairfield dashboard | AB InBev Fairfield brewery | continuous 24 h HRT | "
-    "Scenarios 1 and 2 only | NCIMB 11599"
+    "Scenarios 1 and 2 only | NCIMB 11599 | 60 g/L CDW base case locked (v7)"
 )
 
 _sb_hdr("Focus View")
@@ -3396,9 +3431,14 @@ added_major_capex = (
 )
 
 _sb_hdr("Scenario 1 Inputs")
+st.sidebar.caption(
+    "S1 base case locked at 60 g/L CDW, 60% PHB content, 50% nitrogen reduction, "
+    "100% Jelly Belly COD feed. Drag titer down to 35 g/L to reproduce the v5/v6 "
+    "conservative Year 1 case."
+)
 s1_titer = st.sidebar.slider("S1 CDW titer (g/L)", 10.0, 120.0, 60.0, 1.0, key="v5_s1_titer")
 s1_yield = st.sidebar.slider("S1 biomass yield (kg CDW/kg sugar)", 0.20, 0.80, 0.50, 0.01, key="v5_s1_yield")
-s1_phb = st.sidebar.slider("S1 PHB content (% CDW)", 20.0, 85.0, 40.0, 1.0, key="v5_s1_phb") / 100.0
+s1_phb = st.sidebar.slider("S1 PHB content (% CDW)", 20.0, 85.0, 60.0, 1.0, key="v5_s1_phb") / 100.0
 s1_scp_cp = st.sidebar.slider("S1 SCP protein (% CP)", 50.0, 85.0, 68.0, 1.0, key="v5_s1_scp_cp") / 100.0
 s1_n_reduction = st.sidebar.slider("S1 nitrogen reduction (%)", 0.0, 95.0, 50.0, 1.0, key="v5_s1_n_reduction") / 100.0
 s1_carbon_recovery = st.sidebar.slider("S1 carbon recovery (%)", 70.0, 100.0, 90.0, 1.0, key="v5_s1_carbon_recovery") / 100.0
@@ -3601,9 +3641,14 @@ st.warning(
     "The feedstock sensitivity figure applies a ±20% band to feedstock + pretreatment cost to reflect that uncertainty."
 )
 st.info(
-    "Annual throughput in v5 uses the corrected continuous roll-up: utilized broth volume × titer × "
-    "(8,760 h/year × 85% uptime ÷ 24 h HRT). "
-    "Example: Phase III S1 at 90% utilization and 35 g/L gives about 3,909 t/y CDW, not 10,700 t/y."
+    "Annual throughput uses the continuous roll-up: utilized broth volume × titer × "
+    "(8,760 h/year × 85% uptime ÷ 24 h HRT). At the v7 locked 60 g/L base case, "
+    "Phase III S1 at 90% utilization gives ~6,701 t/y CDW. At the v5/v6 35 g/L "
+    "conservative case, the same configuration gives ~3,909 t/y CDW. "
+    "The site handoff (Fairfield_TEA_v7_Final.pdf, page 7) states ~10,700 t/y "
+    "for the 35 g/L case, which does not match its own formula "
+    "(306,000 L × 35 g/L × 8,760/24 ÷ 1e6 = 3,909 t/y). The v7 TEA does not "
+    "inherit that defect because it computes CDW from first principles."
 )
 
 _section("Phase + Scenario Table")
