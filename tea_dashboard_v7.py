@@ -1947,8 +1947,11 @@ def render_reference_trace(model_key: str, results: List[Any], assumption_kwargs
     refs = scenario_reference_ids(model_key, selected, assumption_kwargs, defaults)
     notes = scenario_specific_notes(model_key, selected, assumption_kwargs, defaults)
 
+    def _esc(s: str) -> str:
+        return s.replace("$", r"\$")
+
     for note in notes:
-        st.markdown(f"- {note}")
+        st.markdown(f"- {_esc(note)}")
 
     for ref_id in refs:
         ref = REFERENCE_LIBRARY[ref_id]
@@ -1959,11 +1962,11 @@ def render_reference_trace(model_key: str, results: List[Any], assumption_kwargs
             link_md = f"[{ref['title']}]({url})"
         else:
             link_md = f"**{ref['title']}** *(no public URL)*"
-        extra = f" -- *{url_note}*" if url_note else ""
+        extra = f" -- *{_esc(url_note)}*" if url_note else ""
         st.markdown(f"- {link_md} `{ref['kind']}`{extra}")
-        st.markdown(f"  Used in dashboard: {ref['why']}")
+        st.markdown(f"  Used in dashboard: {_esc(ref['why'])}")
         if used:
-            st.markdown(f"  Exactly used from this source: {used}")
+            st.markdown(f"  Exactly used from this source: {_esc(used)}")
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -3493,10 +3496,10 @@ scp_target_price = st.sidebar.slider(
     key="v5_scp_price",
 )
 st.sidebar.caption(
-    "**Market price, not MSP.** Default $2.00/kg is the upper end of the "
-    "feed-grade bacterial-SCP benchmark band: fishmeal $1.45-1.79/kg (FRED "
-    "PFISHUSDM 2024-2025), Calysta FeedKind $1.50-2.00/kg (Rabobank / "
-    "Aquafeed), Unibio UniProtein ~$2.00/kg. The MSP reported above is the "
+    "**Market price, not MSP.** Default \\$2.00/kg is the upper end of the "
+    "feed-grade bacterial-SCP benchmark band: fishmeal \\$1.45-1.79/kg (FRED "
+    "PFISHUSDM 2024-2025), Calysta FeedKind \\$1.50-2.00/kg (Rabobank / "
+    "Aquafeed), Unibio UniProtein ~\\$2.00/kg. The MSP reported above is the "
     "project's computed cost floor; market price minus MSP is the operating "
     "margin per kg of SCP sold."
 )
@@ -3644,7 +3647,7 @@ st.info(
 )
 if guardrail_warnings:
     for msg in guardrail_warnings:
-        st.warning(msg, icon="⚠️")
+        st.warning(msg.replace("$", r"\$"), icon="⚠️")
 else:
     st.success("All Fairfield-controlled inputs are inside the current recommended planning bands.", icon="✅")
 st.warning(
@@ -3688,7 +3691,7 @@ sel_fig = st.selectbox("Select Fairfield figure", list(fig_opts.keys()), key="v5
 formula_text = V5_FIGURE_FORMULAS.get(sel_fig)
 if formula_text:
     with st.expander("How is this figure calculated?"):
-        st.markdown(formula_text)
+        st.markdown(formula_text.replace("$", r"\$"))
 st.markdown('<div class="fig-frame">', unsafe_allow_html=True)
 fig = fig_opts[sel_fig]()
 st.pyplot(fig, use_container_width=True)
@@ -3710,9 +3713,9 @@ _margin_of_safety = (
 st.info(
     f"At active settings ({focus_phase} / {focus_scenario_id}, {_be_base.titer_gL:.1f} g/L CDW, "
     f"{_be_base.utilization_pct:.0f}% utilization), each kg of CDW generates "
-    f"${_be_info['rev_per_cdw']:.2f} of revenue against ${_be_info['var_per_cdw']:.2f} of variable cost, "
-    f"for a contribution margin of ${_be_info['margin_per_cdw']:.2f}/kg. "
-    f"Fixed labor is ${_be_info['labor']/1e6:.2f}M/yr. "
+    f"\\${_be_info['rev_per_cdw']:.2f} of revenue against \\${_be_info['var_per_cdw']:.2f} of variable cost, "
+    f"for a contribution margin of \\${_be_info['margin_per_cdw']:.2f}/kg. "
+    f"Fixed labor is \\${_be_info['labor']/1e6:.2f}M/yr. "
     f"Cash break-even requires {_be_cdw_tpy:,.0f} t/y CDW "
     f"(≈ {_be_info['be_titer_gL']:.1f} g/L at current utilization, or "
     f"{_be_info['be_util_pct']:.1f}% utilization at current titer). "
@@ -3804,7 +3807,7 @@ st.caption(
     "Leatherback Fairfield TEA Dashboard v7 — dedicated Fairfield-only dashboard built on "
     "the current TEA workflow, with fixed phase volumes and scenario-locked assumptions. "
     "v7 supersedes v5 and v6: the feed-grade SCP market-price default is corrected to "
-    "$2.00/kg (anchored to fishmeal / FeedKind / UniProtein 2024-2025 benchmarks) and the "
-    "slider is widened to $0.30-$8.00/kg. The human-grade-protein scenario explored in v6 "
+    "\\$2.00/kg (anchored to fishmeal / FeedKind / UniProtein 2024-2025 benchmarks) and the "
+    "slider is widened to \\$0.30-\\$8.00/kg. The human-grade-protein scenario explored in v6 "
     "is not carried into v7 — the modeled scope is the SCP+PHA biorefinery (S1, S2) only."
 )
