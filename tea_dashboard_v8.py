@@ -2583,6 +2583,7 @@ def _fairfield_guardrail_warnings(
     s2_inputs: Dict[str, float],
     process_inputs: Dict[str, float],
     market_inputs: Dict[str, float],
+    operating_mode: str = "continuous",
 ) -> List[str]:
     warnings: List[str] = []
 
@@ -2596,12 +2597,25 @@ def _fairfield_guardrail_warnings(
     for phase, util in phase_utils.items():
         _check(f"{phase} utilization (%)", util, 20.0, 95.0, "Very low utilization is a ramp case; 100% continuous use is usually too optimistic.")
 
-    _check("S1 CDW titer (g/L)", s1_inputs["titer_gL"], 35.0, 85.0, "S1 base case is locked at 60 g/L; 35 g/L reproduces the v5/v6 conservative Year 1 case and >85 g/L should be treated as a stretch assumption.")
-    _check("S2 CDW titer (g/L)", s2_inputs["titer_gL"], 35.0, 85.0, "S2 base case is locked at 60 g/L; values above ~85 g/L move into aggressive high-cell-density territory.")
+    if operating_mode == "fed_batch":
+        titer_lo, titer_hi = 80.0, 250.0
+        phb_lo, phb_hi = 40.0, 80.0
+        titer_note_s1 = "Fed-batch mode: literature band 100-280 g/L (Kim 1994, Ryu 1997, Budde 2011)."
+        titer_note_s2 = titer_note_s1
+        titer_stretch_threshold = 200.0
+    else:
+        titer_lo, titer_hi = 35.0, 85.0
+        phb_lo, phb_hi = 30.0, 72.0
+        titer_note_s1 = "S1 base case is locked at 60 g/L; 35 g/L reproduces the v5/v6 conservative Year 1 case and >85 g/L should be treated as a stretch assumption."
+        titer_note_s2 = "S2 base case is locked at 60 g/L; values above ~85 g/L move into aggressive high-cell-density territory."
+        titer_stretch_threshold = 85.0
+
+    _check("S1 CDW titer (g/L)", s1_inputs.get("titer_gL", 0.0), titer_lo, titer_hi, titer_note_s1)
+    _check("S2 CDW titer (g/L)", s2_inputs.get("titer_gL", 0.0), titer_lo, titer_hi, titer_note_s2)
     _check("S1 biomass yield (kg/kg sugar)", s1_inputs["yield_kg_per_kg_sugar"], 0.40, 0.55)
     _check("S2 biomass yield (kg/kg sugar)", s2_inputs["yield_kg_per_kg_sugar"], 0.42, 0.55)
-    _check("S1 PHB content (% CDW)", s1_inputs["phb_content_frac"] * 100.0, 30.0, 72.0)
-    _check("S2 PHB content (% CDW)", s2_inputs["phb_content_frac"] * 100.0, 30.0, 72.0)
+    _check("S1 PHB content (% CDW)", s1_inputs.get("phb_content_frac", 0.0) * 100.0, phb_lo, phb_hi)
+    _check("S2 PHB content (% CDW)", s2_inputs.get("phb_content_frac", 0.0) * 100.0, phb_lo, phb_hi)
     _check("S1 nitrogen reduction (%)", s1_inputs["n_reduction_frac"] * 100.0, 40.0, 60.0)
     _check("S2 nitrogen reduction (%)", s2_inputs["n_reduction_frac"] * 100.0, 65.0, 85.0)
     _check("S1 carbon recovery (%)", s1_inputs["carbon_recovery_frac"] * 100.0, 85.0, 95.0)
@@ -2616,8 +2630,17 @@ def _fairfield_guardrail_warnings(
 
     _check("Discount rate (%)", market_inputs["discount_rate"] * 100.0, 7.0, 12.0, "The Fairfield handoff requested 9% as the base case.")
 
-    if s1_inputs["titer_gL"] > 85.0 or s2_inputs["titer_gL"] > 85.0:
-        warnings.append("Titer above 85 g/L is allowed for exploration, but should be treated as speculative unless you have process-specific supporting data.")
+    s1_titer = s1_inputs.get("titer_gL", 0.0)
+    s2_titer = s2_inputs.get("titer_gL", 0.0)
+    if s1_titer > titer_stretch_threshold or s2_titer > titer_stretch_threshold:
+        if operating_mode == "fed_batch":
+            warnings.append(
+                f"Fed-batch endpoint CDW above {titer_stretch_threshold:g} g/L is allowed for exploration "
+                "(Ryu 1997 reports 281 g/L with phosphate-limited feed), but should be treated as a stretch "
+                "case; OTR retrofit CapEx should usually be non-zero at this titer."
+            )
+        else:
+            warnings.append("Titer above 85 g/L is allowed for exploration, but should be treated as speculative unless you have process-specific supporting data.")
     if market_inputs["npv_years"] > 15:
         warnings.append("NPV / IRR horizon above 15 years is beyond the original Fairfield 10-year framing and should be treated as a financing sensitivity, not the base case.")
 
@@ -3730,12 +3753,22 @@ scenario_overrides = {
     },
 }
 # In fed-batch mode the per-scenario titer / PHB sliders are superseded by
-# the global fed-batch defaults; strip them so the common-overrides values
-# survive the merge.
+# the global fed-batch defaults. Overwrite the per-scenario values so the
+# downstream merge, the guardrail function, and the display panels all see
+# the same fed-batch titer / PHB that the engine uses.
 if operating_mode == "fed_batch":
     for sid in ("S1", "S2"):
-        scenario_overrides[sid].pop("titer_gL", None)
-        scenario_overrides[sid].pop("phb_content_frac", None)
+        scenario_overrides[sid]["titer_gL"] = float(fed_batch_cdw)
+        scenario_overrides[sid]["phb_content_frac"] = float(fed_batch_phb_pct)
+    s1_titer_eff = float(fed_batch_cdw)
+    s2_titer_eff = float(fed_batch_cdw)
+    s1_phb_eff = float(fed_batch_phb_pct)
+    s2_phb_eff = float(fed_batch_phb_pct)
+else:
+    s1_titer_eff = s1_titer
+    s2_titer_eff = s2_titer
+    s1_phb_eff = s1_phb
+    s2_phb_eff = s2_phb
 
 common_overrides = {
     "electricity_price": electricity_price,
@@ -3798,6 +3831,7 @@ guardrail_warnings = _fairfield_guardrail_warnings(
         "discount_rate": discount_rate,
         "npv_years": float(npv_years),
     },
+    operating_mode=operating_mode,
 )
 
 with st.expander("Fairfield Facility + Scenario Basis", expanded=True):
@@ -3833,8 +3867,8 @@ with st.expander("Fairfield Facility + Scenario Basis", expanded=True):
         st.markdown(
             (
                 f"<div style='line-height:1.7;'>"
-                f"<div><strong>Scenario 1:</strong> 100% Jelly Belly COD, yield {s1_yield:.3f} kg/kg, {s1_titer:.1f} g/L, {s1_phb*100:.0f}% PHB, {s1_scp_cp*100:.0f}% SCP CP</div>"
-                f"<div><strong>Scenario 2:</strong> 70/30 Jelly Belly COD/DLP, yield {s2_yield:.3f} kg/kg, {s2_titer:.1f} g/L, {s2_phb*100:.0f}% PHB, {s2_scp_cp*100:.0f}% SCP CP</div>"
+                f"<div><strong>Scenario 1:</strong> 100% Jelly Belly COD, yield {s1_yield:.3f} kg/kg, {s1_titer_eff:.1f} g/L, {s1_phb_eff*100:.0f}% PHB, {s1_scp_cp*100:.0f}% SCP CP</div>"
+                f"<div><strong>Scenario 2:</strong> 70/30 Jelly Belly COD/DLP, yield {s2_yield:.3f} kg/kg, {s2_titer_eff:.1f} g/L, {s2_phb_eff*100:.0f}% PHB, {s2_scp_cp*100:.0f}% SCP CP</div>"
                 f"<div><strong>SCP target price:</strong> ${scp_target_price:.2f}/kg</div>"
                 f"<div><strong>PHA revenue price basis:</strong> {phb_share*100:.0f}% PHB @ ${phb_standard_price:.2f}/kg + {(1.0-phb_share)*100:.0f}% PHBV @ ${phbv_price:.2f}/kg = <strong>${common_overrides['pha_blended_price']:.2f}/kg</strong></div>"
                 f"<div><strong>SCP credit for PHA MSP:</strong> ${scp_credit_price:.2f}/kg</div>"
