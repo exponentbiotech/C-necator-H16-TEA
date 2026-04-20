@@ -4256,6 +4256,36 @@ guardrail_warnings = _fairfield_guardrail_warnings(
     operating_mode=operating_mode,
 )
 
+# Default-settings note: call out the v9 vs v8/v7 difference in the DSP flowsheet
+# so that headline numbers in the app (under v9 defaults) are reconciled against
+# figures in the existing memo/investor report (which were generated under the
+# v7/v8 NaOCl baseline).
+if dsp_pathway_id == DSP_PATHWAY_DEFAULT and not phbv_enabled:
+    st.info(
+        "**Note — v9 default settings.** Headline economics under the v9 default "
+        "DSP pathway (**Mechanical + enzymatic recovery**: high-pressure "
+        "homogenization followed by protease / lipase polishing; Kessler 2001, "
+        "Yu 2007, Danimer commercial disclosures) will read slightly more "
+        "favorable than the numbers printed in the current investor memo and "
+        "TEA report, which were generated under the older v7/v8 default "
+        "(**NaOCl hypochlorite digestion**, the Biopol-era baseline). "
+        "The upgraded pathway changes DSP economics as follows at Phase III:\n\n"
+        "- PHA extraction cost: **$0.638/kg sellable PHA → $0.250/kg** (–$0.39/kg PHA).\n"
+        "- CDW-side downstream cost: **$0.420/kg CDW → $0.300/kg CDW** (–$0.12/kg CDW).\n"
+        "- Combined annual DSP opex at Phase III: **~$4.96M/yr → ~$2.85M/yr** (–$2.1M/yr).\n"
+        "- DSP CapEx adder: **$0 → $6.0M at Phase III** (HPH skid + polishing reactor; "
+        "scaled linearly with vessel volume to ~$0.75M at Phase I and ~$2.25M at Phase II).\n"
+        "- Net PHA MSP with SCP credit, continuous Phase III base case: "
+        "**~$2.60/kg → ~$2.25/kg** (about –$0.35/kg PHA), lifting Phase III NPV "
+        "by roughly $7–8M per scenario.\n\n"
+        "Switch the DSP pathway in the sidebar to **NaOCl hypochlorite "
+        "(Biopol-era baseline)** to reproduce the memo/report numbers exactly. "
+        "Mechanical + enzymatic is Mw-preserving (retains 80–95% of fermented "
+        "polymer molecular weight) and is the standard flowsheet at modern "
+        "CMO scale, which is why it is now the default; NaOCl remains available "
+        "as a conservative fallback."
+    )
+
 with st.expander("Fairfield Facility + Scenario Basis", expanded=True):
     c1, c2 = st.columns(2)
     with c1:
