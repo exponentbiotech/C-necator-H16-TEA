@@ -3141,6 +3141,74 @@ def fig_v5_returns(results: List[FairfieldResult]) -> plt.Figure:
     return fig
 
 
+def fig_v9_s1_s2_across_phases(
+    results: List[FairfieldResult],
+    scp_target_price: float,
+    discount_rate: float,
+    npv_years: int,
+    operating_mode: str = "continuous",
+    dsp_pathway_label: str = "",
+    phbv_enabled: bool = False,
+    phbv_hv_mol_pct: float = 10.0,
+) -> plt.Figure:
+    """Investor-memo-style 3-panel grouped bar chart: S1 vs S2 across phases.
+
+    Panels: annual revenue, annual cash flow, 10-year NPV at the active
+    discount rate. Matches the style used in the v7 investor memo.
+    """
+    phases = list(PHASE_VOLUMES_L.keys())
+    x = np.arange(len(phases))
+    bar_w = 0.36
+    s1_color = "#3b82f6"
+    s2_color = "#a855f7"
+
+    fig, axes = plt.subplots(1, 3, figsize=(16.0, 5.6), constrained_layout=True)
+
+    revenue_by = {sid: np.array([_fairfield_result(results, p, sid).total_revenue / 1e6 for p in phases]) for sid in ("S1", "S2")}
+    cash_by = {sid: np.array([_fairfield_result(results, p, sid).annual_cash_flow / 1e6 for p in phases]) for sid in ("S1", "S2")}
+    npv_by = {sid: np.array([_fairfield_result(results, p, sid).npv / 1e6 for p in phases]) for sid in ("S1", "S2")}
+
+    def _label_bars(ax, xs, ys, color):
+        y_max = max(max(ys), 0.0)
+        for xi, yi in zip(xs, ys):
+            va = "bottom" if yi >= 0 else "top"
+            ax.text(xi, yi + (0.02 * (y_max if y_max else 1.0)) * (1 if yi >= 0 else -1),
+                    f"${yi:.1f}M", ha="center", va=va, fontsize=9, color=color)
+
+    panels = [
+        (axes[0], revenue_by, "Annual revenue (M$/yr)", "Annual revenue ($M/yr)"),
+        (axes[1], cash_by, "Annual cash flow (M$/yr)", "Annual cash flow ($M/yr)"),
+        (axes[2], npv_by, f"{npv_years}-year NPV at {discount_rate*100:.0f}% (M$)", f"{npv_years}-year NPV at {discount_rate*100:.0f}% ($M)"),
+    ]
+    for ax, data_by, ylabel, panel_title in panels:
+        s1_vals = data_by["S1"]
+        s2_vals = data_by["S2"]
+        ax.bar(x - bar_w/2, s1_vals, width=bar_w, color=s1_color, label="S1", edgecolor="white", linewidth=0.6)
+        ax.bar(x + bar_w/2, s2_vals, width=bar_w, color=s2_color, label="S2", edgecolor="white", linewidth=0.6)
+        _label_bars(ax, x - bar_w/2, s1_vals, s1_color)
+        _label_bars(ax, x + bar_w/2, s2_vals, s2_color)
+        ax.set_xticks(x)
+        ax.set_xticklabels(phases)
+        ax.set_ylabel(ylabel)
+        ax.set_title(panel_title)
+        ax.grid(axis="y", alpha=0.25)
+        ax.legend(loc="upper left", fontsize=9, frameon=False)
+        if min(s1_vals.min(), s2_vals.min()) < 0:
+            ax.axhline(0, color="#334155", lw=0.8)
+        else:
+            y_max_all = max(s1_vals.max(), s2_vals.max())
+            ax.set_ylim(0, y_max_all * 1.18)
+
+    mode_tag = "continuous 60 g/L CDW base case" if operating_mode == "continuous" else "fed-batch 150 g/L CDW base case"
+    prod_tag = f"PHBV @ {phbv_hv_mol_pct:.0f}% HV" if phbv_enabled else "PHB base case"
+    dsp_tag = f"DSP: {dsp_pathway_label}" if dsp_pathway_label else ""
+    subtitle_bits = [f"S1 vs S2 across phases ({mode_tag}, ${scp_target_price:.2f}/kg SCP, {prod_tag})"]
+    if dsp_tag:
+        subtitle_bits.append(dsp_tag)
+    fig.suptitle(" | ".join(subtitle_bits), y=1.02, fontsize=13, fontweight="bold")
+    return fig
+
+
 def fig_v5_npv_vs_price(
     results: List[FairfieldResult],
     phase: str,
@@ -3737,6 +3805,20 @@ V5_FIGURE_FORMULAS: Dict[str, str] = {
         "4. **IRR** = discount rate that makes the NPV exactly zero.\n"
         "5. **Simple payback** = project CapEx ÷ annual cash flow.\n\n"
         "This figure answers how the project improves financially as the facility moves from 50,000 L to 400,000 L."
+    ),
+    "S1 vs S2 Across Phases": (
+        "Investor-memo-style 3-panel grouped bar chart comparing Scenario 1 and Scenario 2 "
+        "at Phase I, II, and III.\n\n"
+        "1. **Annual revenue** = annual sellable PHA × PHA revenue price + annual sellable SCP × SCP selling price. "
+        "In PHBV mode the PHA stream is priced at the (auto-scaled or overridden) PHBV price.\n"
+        "2. **Annual cash flow** = annual revenue - cash operating cost (excludes annualized CapEx).\n"
+        "3. **10-year NPV** = -project CapEx + sum of discounted annual cash flow at the current discount rate "
+        "and horizon.\n\n"
+        "Because titer and PHB content are shared between S1 and S2 at the v9 base case, the two scenarios "
+        "produce identical PHA and SCP tonnage (top-line revenue is identical). S1 and S2 differ only on the "
+        "cost side: S2 has higher nitrogen reduction and higher carbon recovery but pays a DLP pretreatment "
+        "step and a galactose-uptake penalty on the DLP fraction. The panel titles and subtitle reflect the "
+        "currently selected SCP price, DSP pathway, operating mode, and PHBV setting."
     ),
     "NPV vs Selling Price": (
         "This figure holds the selected phase fixed and sweeps only the PHA selling price.\n\n"
@@ -4448,6 +4530,16 @@ fig_opts = {
     "Phase Output": lambda: fig_v5_outputs(results),
     "MSP and Cash Flow": lambda: fig_v5_msp_and_cash(results),
     "Returns by Phase": lambda: fig_v5_returns(results),
+    "S1 vs S2 Across Phases": lambda: fig_v9_s1_s2_across_phases(
+        results,
+        scp_target_price=scp_target_price,
+        discount_rate=discount_rate,
+        npv_years=npv_years,
+        operating_mode=operating_mode,
+        dsp_pathway_label=DSP_PATHWAYS[dsp_pathway_id]["label"],
+        phbv_enabled=bool(phbv_enabled),
+        phbv_hv_mol_pct=float(phbv_hv_mol_pct),
+    ),
     "NPV vs Selling Price": lambda: fig_v5_npv_vs_price(results, focus_phase, scp_target_price, pha_blended_price, discount_rate, npv_years),
     "IRR vs Selling Price": lambda: fig_v5_irr_vs_price(results, focus_phase, scp_target_price, pha_blended_price, npv_years),
     "Cost Structure": lambda: fig_v5_cost_structure(results, focus_phase, focus_scenario_id),
