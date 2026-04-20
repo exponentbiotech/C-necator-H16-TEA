@@ -2336,17 +2336,17 @@ DSP_PATHWAYS: Dict[str, Dict[str, Any]] = {
         "label": "NaOH hot alkali (Hahn 1994 / Choi-Lee 1997)",
         "pha_extraction_per_kg_sellable": 0.450,
         "downstream_per_kg_cdw": 0.380,
-        "phase3_capex": 1_500_000.0,
+        "phase3_capex": 0.0,
         "mw_note": "Mw-degrading but less than NaOCl (~20-40% Mw loss). Adequate for film, blister-pack, and rigid-container grades.",
-        "pathway_note": "Hot alkaline lysis at 60-80 degC. Lower reagent cost than NaOCl; alkali-resistant vessel trim required (budgeted $1.5M at Phase III, scaled by vessel volume for Phases I and II).",
+        "pathway_note": "Hot alkaline lysis at 60-80 degC. Lower reagent cost than NaOCl. Incremental equipment (alkali-resistant wetted parts) is not auto-added to the model; if modeling retrofit cost, bump the 'Added major CapEx' slider.",
     },
     "mechanical_enzymatic": {
         "label": "Mechanical + enzymatic (modern CMO standard)",
         "pha_extraction_per_kg_sellable": 0.250,
         "downstream_per_kg_cdw": 0.300,
-        "phase3_capex": 6_000_000.0,
+        "phase3_capex": 0.0,
         "mw_note": "Mw-preserving. Delivered molecular weight is 80-95% of the fermented polymer; suitable for injection molding, fiber, and melt-processable grades.",
-        "pathway_note": "High-pressure homogenization (~800-1200 bar) to break cell walls, then protease + lipase polishing to remove non-PHA cell matter. Requires high-density biomass (>=100 g/L) to justify the reagent load, so pairs naturally with v8 fed-batch mode. HPH skid + polishing reactor at ~$6M installed for Phase III, linearly scaled by vessel volume for Phases I and II.",
+        "pathway_note": "High-pressure homogenization (~800-1200 bar) to break cell walls, then protease + lipase polishing to remove non-PHA cell matter. Requires high-density biomass (>=100 g/L) to justify the reagent load, so pairs naturally with v8 fed-batch mode. Incremental equipment (HPH skid + polishing reactor) is not auto-added to the model; if modeling retrofit cost, bump the 'Added major CapEx' slider.",
     },
 }
 
@@ -2663,16 +2663,22 @@ def _fairfield_single_result(
     duty_cycle_frac = float(overrides.get("duty_cycle_frac", FED_BATCH_DUTY_FRAC_DEFAULT))
     otr_retrofit_capex = float(overrides.get("otr_retrofit_capex", 0.0)) if operating_mode == "fed_batch" else 0.0
 
-    # v9: DSP pathway CapEx adder (phase-volume scaled).
+    # v9: DSP pathway selector drives the two DSP cost lines (extraction
+    # $/kg PHA, downstream $/kg CDW) via the pathway-keyed sliders. The
+    # incremental equipment CapEx for NaOH or mechanical+enzymatic
+    # flowsheets is NOT auto-added here; users who want to model
+    # retrofit cost should bump the 'Added major CapEx' sidebar slider.
+    # dsp_pathway_capex is retained as a zero placeholder for schema
+    # compatibility with v9 result consumers.
     dsp_pathway_id = str(overrides.get("dsp_pathway_id", DSP_PATHWAY_DEFAULT))
     if dsp_pathway_id not in DSP_PATHWAYS:
         dsp_pathway_id = DSP_PATHWAY_DEFAULT
-    dsp_pathway_capex = _dsp_pathway_capex(dsp_pathway_id, vessel_volume_L)
+    dsp_pathway_capex = 0.0
 
     total_project_capex = float(
         overrides.get(
             "project_capex_purchase",
-            acquisition_cost + added_major_capex + otr_retrofit_capex + dsp_pathway_capex,
+            acquisition_cost + added_major_capex + otr_retrofit_capex,
         )
     )
     discount_rate = float(overrides.get("discount_rate", DISCOUNT_RATE))
@@ -4003,9 +4009,9 @@ _pathway = DSP_PATHWAYS[dsp_pathway_id]
 st.sidebar.caption(
     f"**{_pathway['label']}** \n"
     f"Mw note: {_pathway['mw_note']} \n"
-    f"Phase III CapEx adder: \\${_pathway['phase3_capex']/1e6:.1f}M "
-    f"(scaled by vessel volume for Phases I and II). \n"
-    f"_{_pathway['pathway_note']}_"
+    f"_{_pathway['pathway_note']}_ \n"
+    f"Incremental equipment CapEx is not auto-added; bump the "
+    f"'Added major CapEx' slider below if you want to model it."
 )
 
 _sb_hdr("Process + Cost Inputs")
@@ -4268,10 +4274,12 @@ if dsp_pathway_id == DSP_PATHWAY_DEFAULT and not phbv_enabled:
         "memo and report) to **mechanical + enzymatic recovery** "
         "(high-pressure homogenization + protease / lipase polishing — the standard "
         "flowsheet at modern CMO scale). Impact at Phase III:\n\n"
-        "- PHA minimum selling price (with SCP credit): **\\~\\$2.60/kg → \\~\\$2.25/kg** (about \\$0.35/kg lower).\n"
+        "- PHA minimum selling price (with SCP credit): **\\~\\$2.60/kg → \\~\\$2.00/kg** (about \\$0.60/kg lower).\n"
         "- Annual DSP operating cost: **\\~\\$5.0M → \\~\\$2.9M** (about \\$2.1M lower per year).\n"
-        "- One-time DSP CapEx: **\\$0 → \\~\\$6M** at Phase III (HPH skid + polishing reactor).\n"
-        "- Net Phase III NPV is roughly **\\$7–8M higher** per scenario.\n\n"
+        "- Net Phase III NPV is roughly **\\$13M higher** per scenario from the opex savings.\n\n"
+        "Incremental equipment for the upgraded flowsheet (homogenization skid + "
+        "polishing reactor) is **not** auto-added as CapEx; if you want to model "
+        "that retrofit cost, increase the **Added major CapEx** slider accordingly. "
         "To reproduce the memo/report numbers exactly, switch the DSP pathway "
         "in the sidebar to **NaOCl hypochlorite (Biopol-era baseline)**."
     )
@@ -4302,8 +4310,8 @@ with st.expander("Fairfield Facility + Scenario Basis", expanded=True):
                 f"<div><strong>Added major CapEx:</strong> ${added_major_capex/1e6:.1f}M</div>"
                 f"<div><strong>DSP pathway (v9):</strong> {DSP_PATHWAYS[dsp_pathway_id]['label']} "
                 f"(extraction ${pha_extraction_cost_per_kg_sellable:.3f}/kg PHA, "
-                f"downstream ${downstream_cost_per_kg_cdw:.3f}/kg CDW, "
-                f"Phase III CapEx adder ${DSP_PATHWAYS[dsp_pathway_id]['phase3_capex']/1e6:.1f}M)</div>"
+                f"downstream ${downstream_cost_per_kg_cdw:.3f}/kg CDW; "
+                f"incremental equipment CapEx not auto-added)</div>"
                 f"<div><strong>Annualized CapEx:</strong> ${(focus.annual_major_capex)/1e6:.2f}M/yr at {discount_rate:.0%}, {npv_years} yr</div>"
                 f"</div>"
             ),
