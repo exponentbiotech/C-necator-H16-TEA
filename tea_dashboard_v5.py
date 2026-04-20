@@ -1,31 +1,36 @@
 #!/usr/bin/env python3
 """
-tea_dashboard_v5.py — Streamlit Cloud entry-point shim (v8 is the active model).
+tea_dashboard_v5.py — Streamlit Cloud entry-point shim (v9 is the active model).
 
-The existing Streamlit Cloud deployment points at this filename. v8 is the
+The existing Streamlit Cloud deployment points at this filename. v9 is the
 current working model. Prior revisions are preserved in-repo so you can
 diff against their behavior or revert without touching Streamlit Cloud
 config:
 
   - tea_dashboard_v5_archive.py  (v5 frozen state)
   - tea_dashboard_v6.py          (exploratory HGP scenario, retired)
-  - tea_dashboard_v7.py          (previous live model: continuous only)
-  - tea_dashboard_v8.py          (ACTIVE: adds fed-batch mode toggle)
+  - tea_dashboard_v7_archive.py  (v7 frozen state; revert target)
+  - tea_dashboard_v7.py          (also a shim -> v9, so cloud configs
+                                   that target v7.py still resolve to v9)
+  - tea_dashboard_v8.py          (v8 frozen state: adds fed-batch mode)
+  - tea_dashboard_v9.py          (ACTIVE: adds DSP pathway selector
+                                   + PHBV co-production toggle)
 
-Reverting to v7 is a one-line change below: swap "tea_dashboard_v8.py" for
-"tea_dashboard_v7.py", commit, push.
+Reverting to v7 is a one-line change below: swap "tea_dashboard_v9.py"
+for "tea_dashboard_v7_archive.py", commit, push.
 
-v8 supersedes v7:
-  - Adds a global fermentation-mode toggle (continuous OR fed-batch). The
-    continuous branch behaves identically to v7 (60 g/L CDW, 24 h HRT,
-    85% uptime, 60% PHB), so v8-continuous == v7 numerically.
-  - Fed-batch mode exposes endpoint CDW titer (60-250 g/L, default 150),
-    PHB content (default 68%), cycle time (36-120 h, default 76), duty
-    cycle (40-85%, default 68%), and an OTR-retrofit CapEx adder
-    (0-15 M$, default 0; typical brewery-vessel retrofit $4-12M).
-  - Fed-batch defaults are literature-anchored (Kim 1994 BB 43:892,
-    Ryu 1997 BB 55:28, Budde 2011 AEM 77:2847).
-  - All other v7 functionality (SCP price slider, scenario definitions,
+v9 supersedes v8:
+  - DSP pathway selector. NaOCl hypochlorite (v7/v8 baseline), NaOH hot
+    alkali, and Mechanical + enzymatic (modern CMO standard, new v9
+    default). Each pathway defines its own $/kg PHA extraction cost,
+    $/kg CDW downstream cost, and phase-scaled CapEx adder. Literature
+    anchors: Kessler 2001, Yu 2007, Hahn 1994.
+  - Explicit PHBV co-production. Global toggle drives both S1 and S2.
+    Co-substrate selector (propionate / valerate / levulinate) with
+    literature defaults. HV-content slider. PHBV selling price
+    auto-scales with HV content (Tianan / Kaneka / Danimer anchors);
+    manual-override checkbox unlocks a flat price slider.
+  - All v8 functionality (continuous / fed-batch mode, SCP price slider,
     CapEx sliders, references, memo-facing traceability) is preserved.
 """
 from __future__ import annotations
@@ -34,5 +39,5 @@ import runpy
 from pathlib import Path
 
 _here = Path(__file__).resolve().parent
-_active = _here / "tea_dashboard_v8.py"
+_active = _here / "tea_dashboard_v9.py"
 runpy.run_path(str(_active), run_name="__main__")
