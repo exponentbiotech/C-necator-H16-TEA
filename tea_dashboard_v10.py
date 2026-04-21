@@ -3040,15 +3040,25 @@ def _fairfield_single_result(
     )
     total_revenue = annual_pha_kg * pha_revenue_price + non_pha_revenue
     annual_cash_flow = total_revenue - (total_annual_cost - annual_major_capex)
-    pha_msp_standalone = total_annual_cost / max(1.0, annual_pha_kg)
-    # PHA MSP with non-PHA credit: if HGP is on, credit PHA for the HGP
-    # stream at the HGP selling price (since that is what it actually sells
-    # for). Otherwise credit against the feed-grade SCP credit price.
-    non_pha_credit = (
-        annual_hgp_kg * hgp_selling_price if hgp_enabled
-        else annual_scp_kg * scp_credit_price
+    # v10 fix: in the HGP-alone / phaCAB-knockout configuration the project
+    # does not produce polymer, so PHA minimum-selling-price numbers are not
+    # physically meaningful (they are dominated by the 1/annual_pha_kg
+    # divide-by-near-zero and produce large negative values when an HGP
+    # credit is subtracted). Flag these as NaN so downstream display code
+    # can render "N/A" instead of a misleading dollar figure.
+    _pha_is_suppressed = (
+        hgp_enabled and hgp_production_mode == "alone" and phb_content_frac <= 0.005
     )
-    pha_msp_with_scp_credit = (total_annual_cost - non_pha_credit) / max(1.0, annual_pha_kg)
+    if _pha_is_suppressed or annual_pha_kg <= 1.0:
+        pha_msp_standalone = float("nan")
+        pha_msp_with_scp_credit = float("nan")
+    else:
+        pha_msp_standalone = total_annual_cost / annual_pha_kg
+        non_pha_credit = (
+            annual_hgp_kg * hgp_selling_price if hgp_enabled
+            else annual_scp_kg * scp_credit_price
+        )
+        pha_msp_with_scp_credit = (total_annual_cost - non_pha_credit) / annual_pha_kg
     npv = -total_project_capex + sum(annual_cash_flow / (1 + discount_rate) ** t for t in range(1, npv_years + 1))
     irr = _compute_irr(total_project_capex, annual_cash_flow, npv_years)
     payback = total_project_capex / annual_cash_flow if annual_cash_flow > 0 else float("nan")
@@ -4062,6 +4072,253 @@ def fig_v5_breakeven_util(
     return fig
 
 
+# ═══════════════════════════════════════════════════════════════════════════════
+#  v10 memo-parity figures (live, slider-driven) — added for Revision 3 report
+# ═══════════════════════════════════════════════════════════════════════════════
+# These four figures mirror the memo / Revision 3 investor report and are
+# driven entirely by current sidebar state. They compute the three-mode
+# comparison (v9 baseline / HGP co-production / HGP alone) on the fly by
+# toggling hgp_enabled and hgp_production_mode in a copy of the active
+# overrides dict, so the user can see how moving any slider reshapes the
+# headline story.
+
+V10_C_OFF   = "#64748B"   # slate grey (baseline)
+V10_C_COPR  = "#0E746F"   # teal (co-production)
+V10_C_ALONE = "#B45309"   # amber (alone)
+
+
+def _v10_three_mode_phase3(
+    common_overrides: Dict[str, Any],
+    scenario_overrides: Dict[str, Dict[str, Any]],
+    acquisition_cost: float,
+    added_major_capex: float,
+) -> Dict[str, Dict[str, Any]]:
+    """Run Phase III at both scenarios for the three HGP modes using the
+    currently-active settings. Returns {mode -> {sid -> FairfieldResult}}.
+    mode ∈ {'off','coprod','alone'}."""
+    phase = "Phase III"
+    util_pct = float(PHASE_DEFAULT_UTIL[phase])
+    out: Dict[str, Dict[str, Any]] = {"off": {}, "coprod": {}, "alone": {}}
+    mode_overrides = {
+        "off":    {"hgp_enabled": False},
+        "coprod": {"hgp_enabled": True, "hgp_production_mode": "coproduction"},
+        "alone":  {"hgp_enabled": True, "hgp_production_mode": "alone"},
+    }
+    for mkey, mov in mode_overrides.items():
+        for sid, scen in FAIRFIELD_SCENARIOS.items():
+            ov = dict(common_overrides)
+            ov.update(scenario_overrides[sid])
+            ov.update(mov)
+            ov["labor_cost"] = PHASE_FIXED_LABOR[phase]
+            out[mkey][sid] = _fairfield_single_result(
+                phase, util_pct, scen, acquisition_cost, added_major_capex, ov
+            )
+    return out
+
+
+def fig_v10_phase3_headline(
+    common_overrides: Dict[str, Any],
+    scenario_overrides: Dict[str, Dict[str, Any]],
+    acquisition_cost: float,
+    added_major_capex: float,
+) -> plt.Figure:
+    """Three-mode Phase III bars: revenue / cash flow / NPV, S1 and S2."""
+    grid = _v10_three_mode_phase3(common_overrides, scenario_overrides, acquisition_cost, added_major_capex)
+    fig, axes = plt.subplots(1, 3, figsize=(11.5, 4.4))
+    modes = ["off", "coprod", "alone"]
+    mode_labels = ["Baseline (v9)\nfeed-grade SCP",
+                   "HGP co-production\nwith polymer",
+                   "HGP alone\n(phaCAB KO)"]
+    metrics = [("rev",  "Phase III annual revenue ($M)", lambda r: r.total_revenue / 1e6),
+               ("cf",   "Phase III annual cash flow ($M)", lambda r: r.annual_cash_flow / 1e6),
+               ("npv",  "Phase III 10-yr NPV ($M)", lambda r: r.npv / 1e6)]
+    width = 0.35
+    x = np.arange(len(modes))
+    for ax, (_, title, f) in zip(axes, metrics):
+        s1 = [f(grid[m]["S1"]) for m in modes]
+        s2 = [f(grid[m]["S2"]) for m in modes]
+        ax.bar(x - width/2, s1, width, color="#0E746F", label="S1 (JB COD)")
+        ax.bar(x + width/2, s2, width, color="#B45309", label="S2 (70/30 JB+DLP)")
+        ax.set_xticks(x)
+        ax.set_xticklabels(mode_labels, fontsize=8.5)
+        ax.set_title(title, fontsize=10.5)
+        ax.grid(axis="y", alpha=0.3)
+        ax.axhline(0, color="#334155", linewidth=0.6)
+        for xi, (a, b) in enumerate(zip(s1, s2)):
+            for xv, yv in ((xi - width/2, a), (xi + width/2, b)):
+                va = "bottom" if yv >= 0 else "top"
+                ax.annotate(f"{yv:,.0f}", (xv, yv),
+                            xytext=(0, 3 if yv >= 0 else -3),
+                            textcoords="offset points",
+                            ha="center", va=va, fontsize=7.5)
+        ymax = max(max(s1), max(s2))
+        ymin = min(min(s1), min(s2), 0)
+        ax.set_ylim(ymin * 1.15 if ymin < 0 else 0, ymax * 1.20 if ymax > 0 else 1)
+    axes[0].legend(loc="upper left", framealpha=0.9, fontsize=8.5)
+    fig.suptitle(
+        "Phase III headline economics across HGP operating modes (live, reflects current sidebar)",
+        fontsize=11, y=1.02,
+    )
+    fig.tight_layout()
+    return fig
+
+
+def fig_v10_mass_flow_phase3(
+    common_overrides: Dict[str, Any],
+    scenario_overrides: Dict[str, Dict[str, Any]],
+    acquisition_cost: float,
+    added_major_capex: float,
+) -> plt.Figure:
+    """Stacked Phase III product slate (PHA / feed-SCP / HGP) for S1 across
+    three modes, responsive to current slider state."""
+    grid = _v10_three_mode_phase3(common_overrides, scenario_overrides, acquisition_cost, added_major_capex)
+    fig, ax = plt.subplots(figsize=(8.8, 4.4))
+    modes = ["off", "coprod", "alone"]
+    mode_labels = ["Baseline (v9)\nSCP + PHA",
+                   "HGP + PHA\nco-production",
+                   "HGP alone\n(phaCAB KO)"]
+    pha = [grid[m]["S1"].annual_pha_kg / 1000.0 for m in modes]
+    scp = [grid[m]["S1"].annual_scp_kg / 1000.0 for m in modes]
+    hgp = [getattr(grid[m]["S1"], "annual_hgp_kg", 0.0) / 1000.0 for m in modes]
+    x = np.arange(len(modes)); w = 0.6
+    ax.bar(x, pha, w, color="#0E746F", label="PHA (sellable t/y)")
+    ax.bar(x, scp, w, bottom=pha, color="#64748B", label="Feed-grade SCP (t/y)")
+    ax.bar(x, hgp, w, bottom=[p + s for p, s in zip(pha, scp)],
+           color="#B45309", label="HGP whole-cell mash (t/y)")
+    totals = [p + s + h for p, s, h in zip(pha, scp, hgp)]
+    for xi, (p, s, h, t) in enumerate(zip(pha, scp, hgp, totals)):
+        if p > 50:
+            ax.text(xi, p / 2, f"PHA\n{p:,.0f}", ha="center", va="center",
+                    color="white", fontsize=8.5, fontweight="bold")
+        if s > 50:
+            ax.text(xi, p + s / 2, f"SCP\n{s:,.0f}", ha="center", va="center",
+                    color="white", fontsize=8.5, fontweight="bold")
+        if h > 50:
+            ax.text(xi, p + s + h / 2, f"HGP\n{h:,.0f}", ha="center", va="center",
+                    color="white", fontsize=8.5, fontweight="bold")
+        ax.text(xi, t * 1.02 + 50, f"{t:,.0f} t/y\ntotal", ha="center", va="bottom",
+                fontsize=9, color="#0F172A")
+    ax.set_xticks(x); ax.set_xticklabels(mode_labels, fontsize=9)
+    ax.set_ylabel("Sellable product mass (t/y)")
+    ax.set_title("Phase III product slate by operating mode, S1 (live, reflects current sidebar)")
+    ax.grid(axis="y", alpha=0.3)
+    ax.set_ylim(0, (max(totals) if totals else 1) * 1.2)
+    ax.legend(loc="upper left", framealpha=0.9)
+    fig.tight_layout()
+    return fig
+
+
+def fig_v10_hgp_price_sensitivity(
+    common_overrides: Dict[str, Any],
+    scenario_overrides: Dict[str, Dict[str, Any]],
+    acquisition_cost: float,
+    added_major_capex: float,
+) -> plt.Figure:
+    """NPV at Phase III vs HGP selling price for both co-prod and alone
+    configurations, both scenarios. Respects current sidebar for everything
+    except HGP price (swept 3-12 $/kg) and HGP on/off/mode."""
+    phase = "Phase III"
+    util_pct = float(PHASE_DEFAULT_UTIL[phase])
+    price_grid = np.round(np.arange(3.0, 12.05, 0.5), 2)
+    curves = {("coprod", "S1"): [], ("coprod", "S2"): [],
+              ("alone",  "S1"): [], ("alone",  "S2"): []}
+    mode_overrides = {
+        "coprod": {"hgp_enabled": True, "hgp_production_mode": "coproduction"},
+        "alone":  {"hgp_enabled": True, "hgp_production_mode": "alone"},
+    }
+    for p in price_grid:
+        for mkey, mov in mode_overrides.items():
+            for sid, scen in FAIRFIELD_SCENARIOS.items():
+                ov = dict(common_overrides)
+                ov.update(scenario_overrides[sid])
+                ov.update(mov)
+                ov["hgp_selling_price"] = float(p)
+                ov["labor_cost"] = PHASE_FIXED_LABOR[phase]
+                r = _fairfield_single_result(
+                    phase, util_pct, scen, acquisition_cost, added_major_capex, ov
+                )
+                curves[(mkey, sid)].append(r.npv / 1e6)
+    hgp_price_now = float(common_overrides.get("hgp_selling_price", HGP_SELLING_PRICE_DEFAULT))
+    fig, ax = plt.subplots(figsize=(9.0, 4.8))
+    ax.plot(price_grid, curves[("coprod", "S1")], "-o", color=V10_C_COPR,
+            markersize=4, label="HGP + PHA co-production, S1")
+    ax.plot(price_grid, curves[("coprod", "S2")], "--s", color=V10_C_COPR,
+            markersize=4, label="HGP + PHA co-production, S2")
+    ax.plot(price_grid, curves[("alone",  "S1")], "-o", color=V10_C_ALONE,
+            markersize=4, label="HGP alone (N-replete), S1")
+    ax.plot(price_grid, curves[("alone",  "S2")], "--s", color=V10_C_ALONE,
+            markersize=4, label="HGP alone (N-replete), S2")
+    ax.axvline(hgp_price_now, color="#0F172A", linestyle=":", alpha=0.7)
+    ax.axhline(0, color="#334155", linewidth=0.6)
+    ax.axvspan(3.0, 6.0, color="#F1F5F9", alpha=0.6, zorder=0)
+    ax.axvspan(6.0, 10.0, color="#ECFDF5", alpha=0.4, zorder=0)
+    ax.axvspan(10.0, 12.0, color="#FEF3C7", alpha=0.3, zorder=0)
+    ymin, ymax = ax.get_ylim()
+    ax.text(4.5, ymin + (ymax - ymin) * 0.05, "Solein cost-\ntarget floor",
+            ha="center", fontsize=8, color="#475569")
+    ax.text(8.0, ymin + (ymax - ymin) * 0.05, "Quorn / Solein\nmid-band",
+            ha="center", fontsize=8, color="#475569")
+    ax.text(11.0, ymin + (ymax - ymin) * 0.05, "Branded\nspecialty",
+            ha="center", fontsize=8, color="#475569")
+    ax.text(hgp_price_now, ymax * 0.92 if ymax > 0 else 0,
+            f"current\n${hgp_price_now:.2f}/kg", fontsize=8.5, color="#0F172A",
+            va="top", ha="left")
+    ax.set_xlabel("HGP selling price ($/kg)")
+    ax.set_ylabel("Phase III 10-yr NPV ($M)")
+    ax.set_title("Phase III NPV sensitivity to HGP selling price (live, reflects current sidebar)")
+    ax.grid(alpha=0.3)
+    ax.legend(loc="lower right", framealpha=0.9, fontsize=8.5)
+    fig.tight_layout()
+    return fig
+
+
+def fig_v10_dsp_stack(
+    hgp_dsp_cost_per_kg: float,
+) -> plt.Figure:
+    """Side-by-side DSP cost stack ($/kg sellable non-PHA product): feed-grade
+    SCP (centrifuge + spray-dry + pelletize, ~$0.60/kg all-in) vs HGP whole-
+    cell mash (TFF endotoxin + food-grade spray dry + QA). The HGP total
+    respects the current sidebar HGP-DSP slider by proportionally scaling
+    the three HGP sub-lines so the stack sums to the active $/kg value."""
+    fig, ax = plt.subplots(figsize=(8.5, 4.4))
+    scp_stack = [
+        ("Centrifuge + spray dry\n+ pelletize", 0.55, "#64748B"),
+        ("CIP + sanitation",                    0.05, "#94A3B8"),
+    ]
+    base_hgp = [
+        ("Endotoxin (LPS) removal\nTFF + polymyxin-B polish", 1.05, "#B45309"),
+        ("Food-grade spray dry\n+ sanitary packaging",        0.50, "#D97706"),
+        ("QA / regulatory overhead",                          0.25, "#FCD34D"),
+    ]
+    base_hgp_total = sum(v for _, v, _ in base_hgp)
+    scale = hgp_dsp_cost_per_kg / base_hgp_total if base_hgp_total > 0 else 1.0
+    hgp_stack = [(name, v * scale, c) for (name, v, c) in base_hgp]
+    scp_total = sum(v for _, v, _ in scp_stack)
+    hgp_total = sum(v for _, v, _ in hgp_stack)
+    for col_x, stack, total in [(0, scp_stack, scp_total), (1, hgp_stack, hgp_total)]:
+        bottom = 0.0
+        for (name, val, color) in stack:
+            ax.bar(col_x, val, width=0.5, bottom=bottom, color=color,
+                   edgecolor="white", linewidth=1.0)
+            if val > 0.1:
+                ax.text(col_x, bottom + val / 2, f"{name}\n${val:.2f}/kg",
+                        ha="center", va="center", color="white",
+                        fontsize=8.0, fontweight="bold")
+            bottom += val
+        ax.text(col_x, total + 0.06, f"${total:.2f}/kg\nall-in",
+                ha="center", va="bottom", fontsize=10, color="#0F172A",
+                fontweight="bold")
+    ax.set_xticks([0, 1])
+    ax.set_xticklabels(["Feed-grade SCP\n(animal feed)",
+                        "HGP whole-cell mash\n(human ingredient)"])
+    ax.set_ylabel("Downstream cost ($/kg sellable non-PHA product)")
+    ax.set_title(f"DSP cost stack: feed-grade SCP vs HGP (HGP slider at ${hgp_dsp_cost_per_kg:.2f}/kg)")
+    ax.set_ylim(0, max(scp_total, hgp_total) * 1.4)
+    ax.grid(axis="y", alpha=0.3)
+    fig.tight_layout()
+    return fig
+
+
 V5_FIGURE_FORMULAS: Dict[str, str] = {
     "Phase Output": (
         "This figure is built in 4 steps.\n\n"
@@ -4170,6 +4427,55 @@ V5_FIGURE_FORMULAS: Dict[str, str] = {
         "4. Plot the resulting low and high MSP values on either side of the base MSP line.\n\n"
         "Inputs tested include yield, titer, PHB content, carbon recovery, electricity price, blended feedstock price, blended pretreatment cost, nitrogen reduction, labor, acquisition cost, and discount rate.\n\n"
         "Longer bars mean that input has a larger effect on the selected case economics."
+    ),
+    "Phase III Headline (v10, three modes)": (
+        "Three-mode headline chart used in the investor memo.\n\n"
+        "For each HGP mode (off / co-production / alone) the engine is run at Phase III with the current "
+        "sidebar settings:\n"
+        "- **off**: v9 baseline. Non-PHA biomass is sold as feed-grade SCP at the current SCP price.\n"
+        "- **co-production**: HGP toggle ON, mode = co-production. Polymer and non-PHA streams are "
+        "unchanged from v9, but the non-PHA stream is priced at the HGP selling price with the HGP "
+        "DSP cost line added.\n"
+        "- **alone**: HGP toggle ON, mode = alone. PHB content is forced to the alone-mode basal value "
+        "(0% for a phaCAB-knockout strain, up to 15% to model a leaky wild-type). Full CDW routes into "
+        "HGP at the 85% whole-cell recovery.\n\n"
+        "Three panels show annual revenue, annual cash flow, and 10-year NPV at the current discount "
+        "rate, with S1 and S2 side by side. Every bar is recomputed whenever any sidebar slider moves."
+    ),
+    "Product Slate by Mode (Phase III)": (
+        "Stacked Phase III mass flow for S1 across the three HGP modes, built using the current sidebar.\n\n"
+        "For each mode the engine returns annual sellable PHA, annual sellable feed-grade SCP, and annual "
+        "HGP whole-cell mash tonnage.\n\n"
+        "Totals above each bar are annual sellable product mass, not raw fermentation mass. Downstream "
+        "recoveries are baked into the tonnage (PHA 0.88 × 0.95; feed-grade SCP 0.85 × 0.92; HGP 0.85 "
+        "whole-cell mash on the non-PHA fraction of CDW)."
+    ),
+    "HGP Price Sensitivity": (
+        "Phase III 10-year NPV as the HGP selling price sweeps from $3/kg to $12/kg, holding everything "
+        "else at the current sidebar values.\n\n"
+        "Four curves are shown: co-production S1, co-production S2, HGP-alone S1, HGP-alone S2. The "
+        "solid vertical line marks the current HGP price slider value. The three shaded bands are the "
+        "commercial reference ranges used elsewhere in the model: $3-6/kg (Solein dry-protein production-"
+        "cost floor), $6-10/kg (Quorn / Solein mid-band), and $10-12/kg (branded specialty off-take).\n\n"
+        "Anywhere the curves sit above zero the project is NPV-positive at that HGP price."
+    ),
+    "P&L Waterfall": (
+        "Annual P&L decomposition at the current focus phase and scenario.\n\n"
+        "Starts from total annual revenue (PHA + SCP or HGP) and subtracts each cost bucket in turn "
+        "(feedstock, pretreatment, nitrogen, electricity, steam, PHA extraction, downstream, CIP, HGP "
+        "DSP if enabled, labor) to land on annual operating cash flow (excluding annualized CapEx).\n\n"
+        "Green bars are additive (revenue), red bars are subtractive (cost buckets), blue is the residual "
+        "operating cash flow for the year."
+    ),
+    "DSP Cost Stack": (
+        "Side-by-side downstream-processing cost stack, $/kg of sellable non-PHA product.\n\n"
+        "**Left:** feed-grade SCP train (centrifuge + spray-dry + pelletize + CIP), ~$0.60/kg all-in at "
+        "Phase III scale. This number is included in the engine's CDW-wide downstream cost line and has "
+        "no separate SCP DSP slider.\n\n"
+        "**Right:** HGP whole-cell mash train (TFF endotoxin reduction + optional polymyxin-B polish + "
+        "food-grade spray dry + sanitary packaging + release QA). The sub-stack is scaled so the total "
+        "matches the **HGP DSP cost ($/kg HGP)** slider in the sidebar, so moving that slider "
+        "proportionally rescales the three HGP segments."
     ),
 }
 
@@ -4965,7 +5271,12 @@ c1, c2, c3, c4, c5, c6 = st.columns(6)
 c1.metric("Scenario", focus.scenario_id)
 c2.metric("Phase", focus.phase)
 c3.metric("CDW (t/y)", f"{focus.annual_cdw_tpy:,.0f}")
-c4.metric("PHA MSP w/ SCP", f"${focus.pha_msp_with_scp_credit:.2f}/kg")
+_pha_msp_display = (
+    "N/A (no polymer)"
+    if not np.isfinite(focus.pha_msp_with_scp_credit)
+    else f"${focus.pha_msp_with_scp_credit:.2f}/kg"
+)
+c4.metric("PHA MSP w/ SCP", _pha_msp_display)
 c5.metric("NPV", f"${focus.npv/1e6:,.1f}M")
 c6.metric("IRR", f"{focus.irr*100:,.1f}%" if np.isfinite(focus.irr) else "n/a")
 
@@ -5036,10 +5347,19 @@ if rows:
     st.download_button("Download Fairfield v5 CSV", data=csv, file_name="fairfield_v5_results.csv", mime="text/csv")
 
 _section("Figures")
+# v10 Revision 3: dropdown is ordered by narrative importance for an
+# investor reading the report. The top five figures are the headline
+# story (mode comparison, product slate, scenario comparison, HGP price,
+# unit economics); the next four are phase-specific decomposition
+# (waterfall, DSP stack, full cost structure, discounted cash flow);
+# the final four are scale and sensitivity.
 fig_opts = {
-    "Phase Output": lambda: fig_v5_outputs(results),
-    "MSP and Cash Flow": lambda: fig_v5_msp_and_cash(results),
-    "Returns by Phase": lambda: fig_v5_returns(results),
+    "Phase III Headline (v10, three modes)": lambda: fig_v10_phase3_headline(
+        common_overrides, scenario_overrides, acquisition_cost, added_major_capex,
+    ),
+    "Product Slate by Mode (Phase III)": lambda: fig_v10_mass_flow_phase3(
+        common_overrides, scenario_overrides, acquisition_cost, added_major_capex,
+    ),
     "S1 vs S2 Across Phases": lambda: fig_v9_s1_s2_across_phases(
         results,
         scp_target_price=scp_target_price,
@@ -5050,10 +5370,18 @@ fig_opts = {
         phbv_enabled=bool(phbv_enabled),
         phbv_hv_mol_pct=float(phbv_hv_mol_pct),
     ),
+    "HGP Price Sensitivity": lambda: fig_v10_hgp_price_sensitivity(
+        common_overrides, scenario_overrides, acquisition_cost, added_major_capex,
+    ),
+    "MSP and Cash Flow": lambda: fig_v5_msp_and_cash(results),
     "NPV vs Selling Price": lambda: fig_v5_npv_vs_price(results, focus_phase, scp_target_price, pha_blended_price, discount_rate, npv_years),
     "IRR vs Selling Price": lambda: fig_v5_irr_vs_price(results, focus_phase, scp_target_price, pha_blended_price, npv_years),
+    "P&L Waterfall": lambda: fig_v5_waterfall(results, focus_phase, focus_scenario_id),
+    "DSP Cost Stack": lambda: fig_v10_dsp_stack(float(hgp_dsp_cost_per_kg)),
     "Cost Structure": lambda: fig_v5_cost_structure(results, focus_phase, focus_scenario_id),
     "Discounted Cash Flow": lambda: fig_v5_discounted_cf(results, focus_phase, focus_scenario_id, discount_rate, npv_years),
+    "Phase Output": lambda: fig_v5_outputs(results),
+    "Returns by Phase": lambda: fig_v5_returns(results),
     "Feedstock Sensitivity": lambda: fig_v5_feedstock_sensitivity(results, focus_phase, scp_credit_price),
     "OAT Sensitivity": lambda: fig_v5_oat_sensitivity(
         results, focus_phase, focus_scenario_id, acquisition_cost, added_major_capex,
