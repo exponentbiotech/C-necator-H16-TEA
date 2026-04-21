@@ -149,10 +149,14 @@ Revision history:
                 fraction of CDW is sold as HGP. PHB and PHBV behavior
                 are unchanged from v9.
               - "HGP alone (minimize PHA)": the fermenter is operated
-                N-replete to suppress PHA accumulation. The PHB content
-                is overridden to a basal 8 % (range 0-15 %) and the
-                non-PHA fraction (~92 % of CDW) is sold as HGP. PHA
-                revenue is de minimis in this mode.
+                N-replete AND the strain is assumed to carry a phaCAB
+                knockout (delta-phaC in C. necator; Pohlmann 2006,
+                Budde 2011) so that PHA accumulation is abolished
+                entirely. PHB content is overridden to 0 % by default
+                (slider range 0-15 %, where the upper bound represents
+                the wild-type N-replete case if the KO strain is not
+                yet available). Essentially the whole CDW is sold as
+                HGP; PHA revenue is de minimis in this mode.
           * HGP-specific downstream cost line: $1.80/kg sellable HGP
             (range $0.50-$5.00/kg), covering endotoxin removal by
             ultrafiltration / TFF, food-grade spray drying, sanitary
@@ -1000,19 +1004,35 @@ REFERENCE_LIBRARY: Dict[str, Dict[str, str]] = {
         "url": "https://calysta.com/",
         "url_note": "FeedKind-HP pricing and specifications are commercial disclosures; FDA regulatory status is for animal feed, not human food.",
     },
+    "pohlmann_2006": {
+        "title": "Pohlmann et al. 2006, Nat. Biotechnol. 24(10):1257-1262 — Genome sequence of the bioplastic-producing 'Knallgas' bacterium Ralstonia eutropha H16",
+        "kind": "Genome + physiology reference",
+        "why": "Definitive genome paper for C. necator H16 (formerly R. eutropha). Maps the phaCAB operon and confirms that deletion of phaC abolishes PHB synthase activity and eliminates PHA accumulation entirely. This is the primary anchor for the v10 HGP-alone default of 0% residual PHA under a phaCAB knockout.",
+        "used": "v10 primary anchor for the HGP-alone residual-PHB default of 0.00 (phaCAB knockout strain). Establishes that a complete KO is genetically feasible and directly eliminates the polymer-accumulation phenotype.",
+        "url": "https://doi.org/10.1038/nbt1244",
+        "url_note": "",
+    },
+    "budde_2011": {
+        "title": "Budde, Riedel, Willis, Rha & Sinskey 2011, Appl. Environ. Microbiol. 77(9):2847-2854 — Growth and polyhydroxybutyrate production by Ralstonia eutropha in emulsified plant oil medium",
+        "kind": "Strain engineering / KO phenotype",
+        "why": "Reports phenotypic characterization of C. necator H16 delta-phaCAB (PHB-negative) derivative strains under multiple substrate conditions. Confirms experimentally that the KO strain produces effectively zero PHB under both N-replete and N-limited conditions, and that cell growth is otherwise normal. Used in v10 to justify setting the HGP-alone default to 0% residual PHB rather than the wild-type 5-15% basal band.",
+        "used": "v10 experimental anchor for HGP-alone mode: confirms that the phaCAB-KO phenotype eliminates PHA accumulation in practice, not only in theory, across relevant carbon substrates.",
+        "url": "https://doi.org/10.1128/AEM.02429-10",
+        "url_note": "",
+    },
     "braunegg_1998": {
         "title": "Braunegg, Lefebvre & Genser 1998, J. Biotechnol. 65(2-3):127-161 — Polyhydroxyalkanoates, biopolyesters from renewable resources: Physiological and engineering aspects",
         "kind": "Literature review",
-        "why": "Comprehensive review of PHA physiology in Cupriavidus / Ralstonia / Alcaligenes-class bacteria. Documents basal PHA accumulation under N-replete growth (5-15% of CDW) vs. accumulation phase under N-limitation (up to 80%). Provides the physiological basis for the v10 HGP-alone mode basal PHB override.",
-        "used": "v10 anchor for the HGP-alone basal PHB default of 8% CDW (range 0-15%) when the fermenter is operated N-replete to suppress PHA accumulation and maximize HGP yield.",
+        "why": "Comprehensive review of PHA physiology in Cupriavidus / Ralstonia / Alcaligenes-class bacteria. Documents basal PHA accumulation under N-replete growth (5-15% of CDW) vs. accumulation phase under N-limitation (up to 80%). Provides the wild-type upper-bound on the HGP-alone residual-PHB slider (used when the phaCAB-KO strain is not yet available or is phenotypically leaky).",
+        "used": "v10 upper-bound anchor on the HGP-alone residual-PHB slider (0-15% CDW) representing wild-type N-replete behavior, as an alternative to the phaCAB-KO default of 0%.",
         "url": "https://doi.org/10.1016/S0168-1656(98)00126-6",
         "url_note": "",
     },
     "khanna_2005": {
         "title": "Khanna & Srivastava 2005, Process Biochem. 40(2):607-619 — Recent advances in microbial polyhydroxyalkanoates",
         "kind": "Literature review",
-        "why": "Secondary anchor for basal-PHA accumulation under growth-phase (N-replete) fermentation of C. necator and related organisms, and for the transition-point between growth-phase and accumulation-phase operation. Used alongside Braunegg 1998 to bound the HGP-alone basal PHB range.",
-        "used": "v10 secondary anchor for the HGP-alone basal PHB range of 0-15% CDW; corroborates the 5-15% literature band for N-replete growth.",
+        "why": "Secondary anchor for basal-PHA accumulation under growth-phase (N-replete) fermentation of C. necator and related organisms, and for the transition-point between growth-phase and accumulation-phase operation. Used alongside Braunegg 1998 to bound the HGP-alone wild-type residual-PHB range.",
+        "used": "v10 secondary anchor for the wild-type portion of the HGP-alone residual-PHB slider (0-15% CDW); corroborates the 5-15% literature band for N-replete growth in the absence of a phaCAB knockout.",
         "url": "https://doi.org/10.1016/j.procbio.2004.01.053",
         "url_note": "",
     },
@@ -2559,9 +2579,16 @@ def phbv_auto_price(hv_mol_pct: float) -> float:
 #     * Quorn / Solein-style spray-dried mash typically recovers 80-90 %.
 #   Crude-protein content   : 0.63 (range 0.45 - 0.75)
 #     * Matassa 2016 review: bacterial SCP 55-75 % CP.
-#   HGP-alone basal PHB    : 0.08 (range 0.00 - 0.15)
-#     * N-replete growth of C. necator gives 5-15 % basal PHA even without
-#       deliberate accumulation (Braunegg 1998, Khanna 2005).
+#   HGP-alone residual PHB  : 0.00 (range 0.00 - 0.15)
+#     * Default assumes a phaCAB knockout strain (delta-phaC in C. necator
+#       abolishes PHB synthase and eliminates PHA accumulation entirely;
+#       Pohlmann 2006, Budde 2011). With the KO default the HGP-alone
+#       product slate is ~100% protein-rich biomass and there is no
+#       residual polymer to process or sell.
+#     * The 0-15% slider range is retained so the user can model the
+#       wild-type N-replete case (Braunegg 1998, Khanna 2005: 5-15%
+#       basal PHB under growth-phase metabolism) if the KO strain is
+#       not yet available, or to represent an incomplete-KO phenotype.
 #
 # Regulatory caveat: no bacterial SCP is currently GRAS-approved for human
 # food in the United States. EFSA novel-food path exists but typically takes
@@ -2573,7 +2600,7 @@ HGP_SELLING_PRICE_DEFAULT = 8.00
 HGP_DSP_COST_PER_KG_DEFAULT = 1.80
 HGP_RECOVERY_FRAC_DEFAULT = 0.85
 HGP_CP_DEFAULT = 0.63
-HGP_ALONE_PHB_FRAC_DEFAULT = 0.08
+HGP_ALONE_PHB_FRAC_DEFAULT = 0.00  # phaCAB knockout; no residual PHA
 
 PHASE_VOLUMES_L: Dict[str, float] = {
     "Phase I": 50_000.0,
@@ -3119,9 +3146,11 @@ def _fairfield_guardrail_warnings(
     _check("S2 biomass yield (kg/kg sugar)", s2_inputs["yield_kg_per_kg_sugar"], 0.42, 0.55)
     if hgp_alone:
         _check("S1 PHB content (% CDW, HGP-alone)", s1_inputs.get("phb_content_frac", 0.0) * 100.0, 0.0, 15.0,
-               "HGP-alone mode operates N-replete; basal PHA accumulation of 5-15% is expected (Braunegg 1998).")
+               "HGP-alone default assumes a phaCAB knockout strain (0% PHA; Pohlmann 2006, Budde 2011). "
+               "Values up to 15% reflect the wild-type N-replete upper bound (Braunegg 1998).")
         _check("S2 PHB content (% CDW, HGP-alone)", s2_inputs.get("phb_content_frac", 0.0) * 100.0, 0.0, 15.0,
-               "HGP-alone mode operates N-replete; basal PHA accumulation of 5-15% is expected (Braunegg 1998).")
+               "HGP-alone default assumes a phaCAB knockout strain (0% PHA; Pohlmann 2006, Budde 2011). "
+               "Values up to 15% reflect the wild-type N-replete upper bound (Braunegg 1998).")
     else:
         _check("S1 PHB content (% CDW)", s1_inputs.get("phb_content_frac", 0.0) * 100.0, phb_lo, phb_hi)
         _check("S2 PHB content (% CDW)", s2_inputs.get("phb_content_frac", 0.0) * 100.0, phb_lo, phb_hi)
@@ -4509,14 +4538,16 @@ if hgp_enabled:
     ))
     if hgp_production_mode == "alone":
         hgp_alone_phb_frac = float(st.sidebar.slider(
-            "HGP-alone basal PHB content (fraction)",
+            "HGP-alone residual PHB content (fraction)",
             min_value=0.00, max_value=0.15,
             value=HGP_ALONE_PHB_FRAC_DEFAULT, step=0.01,
             key="v10_hgp_alone_phb",
             help=(
-                "Under N-replete growth, C. necator still accumulates a basal "
-                "5-15% PHA even without deliberate N-limitation (Braunegg 1998, "
-                "Khanna 2005). Default 8% matches mid-exponential-phase values."
+                "Default 0% assumes a phaCAB knockout strain: deletion of the PHB "
+                "synthase operon in C. necator abolishes PHA accumulation entirely "
+                "(Pohlmann 2006, Budde 2011). Raise the slider to model the "
+                "wild-type N-replete case where basal PHA accumulates to 5-15% of "
+                "CDW even without deliberate N-limitation (Braunegg 1998, Khanna 2005)."
             ),
         ))
     else:
@@ -4695,7 +4726,10 @@ if hgp_enabled:
     _hgp_mode_text = (
         "Co-production with polymer — PHA stream retained, non-PHA CDW sold as HGP."
         if hgp_production_mode == "coproduction"
-        else "HGP alone — N-replete fermentation, PHB forced to basal level; ~92% of CDW sold as HGP."
+        else (
+            f"HGP alone — phaCAB knockout strain (residual PHB {hgp_alone_phb_frac*100:.0f}%), "
+            "N-replete fermentation; ~100% of CDW sold as HGP when KO is complete."
+        )
     )
     st.info(
         "**Note — human-grade SCP (HGP) mode is ON (v10).** "
@@ -4797,7 +4831,7 @@ with st.expander("Fairfield Facility + Scenario Basis", expanded=True):
                 f"{hgp_cp_frac*100:.0f}% crude protein, "
                 f"${hgp_dsp_cost_per_kg:.2f}/kg HGP DSP)</div>"
                 f"<div><strong>HGP production mode:</strong> "
-                f"{'Co-production with polymer' if hgp_production_mode == 'coproduction' else 'HGP alone (basal PHB ' + f'{hgp_alone_phb_frac*100:.0f}%)'}</div>"
+                f"{'Co-production with polymer' if hgp_production_mode == 'coproduction' else ('HGP alone, phaCAB KO (residual PHB ' + f'{hgp_alone_phb_frac*100:.0f}%)')}</div>"
                 f"<div><strong>PHA MSP credit basis:</strong> HGP at ${hgp_selling_price:.2f}/kg (v10 override)</div>"
             )
         else:
