@@ -5349,10 +5349,6 @@ c9.metric("SCP output", f"{focus.annual_scp_kg/1e3:,.0f} t/y")
 c10.metric("Cash flow", f"${focus.annual_cash_flow/1e6:,.2f}M/yr")
 
 _section("Fairfield Notes")
-st.info(
-    "This v5 dashboard is Fairfield-only. It excludes autotrophic H2/CO2, HFCS-90 fructose, molasses, and standard whey permeate. "
-    "The only modeled feedstock paths are Scenario 1 Jelly Belly COD and Scenario 2 70/30 Jelly Belly COD + DLP."
-)
 if guardrail_warnings:
     for msg in guardrail_warnings:
         st.warning(msg.replace("$", r"\$"), icon="⚠️")
