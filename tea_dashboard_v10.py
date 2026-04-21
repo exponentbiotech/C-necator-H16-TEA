@@ -2784,6 +2784,11 @@ class FairfieldResult:
     hgp_cp_frac: float = 0.0
     annual_hgp_kg: float = 0.0
     hgp_dsp_cost: float = 0.0
+    # v10: effective selling prices actually used for revenue (convenience
+    # copies so the Phase + Scenario Table can render the price that was
+    # booked under the current slate without re-deriving it from overrides).
+    pha_selling_price_effective: float = 0.0
+    non_pha_selling_price_effective: float = 0.0
 
 
 FAIRFIELD_SCENARIOS: Dict[str, FairfieldScenario] = {
@@ -3123,6 +3128,10 @@ def _fairfield_single_result(
         hgp_cp_frac=hgp_cp_frac,
         annual_hgp_kg=annual_hgp_kg,
         hgp_dsp_cost=hgp_dsp_cost,
+        pha_selling_price_effective=float(pha_revenue_price),
+        non_pha_selling_price_effective=float(
+            hgp_selling_price if hgp_enabled else scp_target_price
+        ),
     )
 
 
@@ -3147,23 +3156,45 @@ def _fairfield_result(results: List[FairfieldResult], phase: str, scenario_id: s
 
 
 def _fairfield_rows(results: List[FairfieldResult]) -> List[Dict[str, Any]]:
+    """Build the Phase + Scenario Table rows (v10 compact layout).
+
+    One row per phase x scenario. Columns surface the v10-relevant
+    slate directly: HGP mode, PHBV state, the non-PHA product sold,
+    and every headline financial metric. Capacity is shown as a
+    single "utilized volume" column in kL so investors do not have
+    to reconcile installed volume + utilization + utilized volume
+    into the same number in their head.
+    """
     rows: List[Dict[str, Any]] = []
     for r in results:
+        if r.hgp_enabled:
+            hgp_mode = "Co-production" if r.hgp_production_mode == "coproduction" else "HGP alone"
+            non_pha_label = "HGP"
+        else:
+            hgp_mode = "Off"
+            non_pha_label = "SCP"
+        phbv_flag = "On" if r.phbv_enabled else "Off"
+        pha_msp = (
+            round(r.pha_msp_with_scp_credit, 3)
+            if np.isfinite(r.pha_msp_with_scp_credit) else np.nan
+        )
         rows.append({
             "Scenario": r.scenario_id,
             "Phase": r.phase,
-            "Installed volume (L)": int(r.vessel_volume_L),
-            "Utilization (%)": round(r.utilization_pct, 1),
-            "Utilized volume (L)": round(r.active_volume_L, 0),
+            "HGP mode": hgp_mode,
+            "PHBV": phbv_flag,
+            "Utilized volume (kL)": round(r.active_volume_L / 1000.0, 1),
             "CDW (t/y)": round(r.annual_cdw_tpy, 1),
-            "PHA sellable (t/y)": round(r.annual_pha_kg / 1000.0, 1),
-            "SCP sellable (t/y)": round(r.annual_scp_kg / 1000.0, 1),
-            "PHA MSP w/ SCP credit ($/kg)": round(r.pha_msp_with_scp_credit, 3),
-            "PHA MSP standalone ($/kg)": round(r.pha_msp_standalone, 3),
+            "PHA (t/y)": round(r.annual_pha_kg / 1000.0, 1),
+            "SCP (t/y)": round(r.annual_scp_kg / 1000.0, 1),
+            "HGP (t/y)": round(r.annual_hgp_kg / 1000.0, 1),
+            "PHA price ($/kg)": round(r.pha_selling_price_effective, 2),
+            f"{non_pha_label} price ($/kg)": round(r.non_pha_selling_price_effective, 2),
+            f"PHA MSP w/ {non_pha_label} credit ($/kg)": pha_msp,
             "Revenue (M$/yr)": round(r.total_revenue / 1e6, 3),
             "Cost (M$/yr)": round(r.total_annual_cost / 1e6, 3),
             "Cash flow (M$/yr)": round(r.annual_cash_flow / 1e6, 3),
-            "NPV (M$)": round(r.npv / 1e6, 3),
+            "NPV (M$)": round(r.npv / 1e6, 2),
             "IRR (%)": round(r.irr * 100, 2) if np.isfinite(r.irr) else np.nan,
             "Payback (yr)": round(r.simple_payback_years, 2) if np.isfinite(r.simple_payback_years) else np.nan,
         })
@@ -5615,11 +5646,27 @@ st.info(
 )
 
 _section("Phase + Scenario Table")
+st.caption(
+    "One row per phase × scenario for the current sidebar slate. "
+    "**HGP mode** is *Off* (feed-grade SCP on the non-PHA stream), *Co-production* "
+    "(PHA retained, non-PHA stream sold as human-grade protein), or *HGP alone* "
+    "(phaC knockout, PHA = 0, near-100% of biomass sold as HGP). "
+    "**PHBV** is the co-production toggle for the polymer stream. "
+    "**PHA price** is the PHB / PHBV blend (or the PHBV auto-price if PHBV is on). "
+    "The non-PHA price column is labeled *SCP* or *HGP* depending on the HGP mode, "
+    "and the MSP column discloses which stream is giving the credit. "
+    "PHA MSP reads **NaN** when the configuration produces no polymer (HGP-alone / phaCAB KO)."
+)
 rows = _fairfield_rows(results)
 st.dataframe(rows, use_container_width=True)
 if rows:
     csv = "\n".join([",".join(rows[0].keys())] + [",".join(str(v) for v in row.values()) for row in rows]).encode()
-    st.download_button("Download Fairfield v5 CSV", data=csv, file_name="fairfield_v5_results.csv", mime="text/csv")
+    st.download_button(
+        "Download Phase + Scenario CSV",
+        data=csv,
+        file_name="fairfield_phase_scenario_results.csv",
+        mime="text/csv",
+    )
 
 _section("Figures")
 # v10 Revision 3: dropdown is ordered by narrative importance for an
