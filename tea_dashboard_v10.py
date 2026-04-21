@@ -4983,6 +4983,185 @@ with _det_col_scenario:
     )
 focus_scenario_id = focus_scenario.split(" — ", 1)[0]
 
+# ── Product Slate (top of sidebar) ─────────────────────────────────────────
+_sb_hdr("Product Slate")
+phbv_enabled = st.sidebar.checkbox(
+    "Enable PHBV co-production",
+    value=PHBV_ENABLED_DEFAULT,
+    key="v9_phbv_enabled",
+)
+st.sidebar.caption(
+    "Sells all PHA as PHBV at an HV-scaled price. Adds a co-substrate cost."
+)
+hgp_enabled = st.sidebar.checkbox(
+    "Enable human-grade SCP (HGP)",
+    value=HGP_ENABLED_DEFAULT,
+    key="v10_hgp_enabled",
+)
+st.sidebar.caption(
+    "Sells non-PHA biomass as human-grade protein instead of feed-grade SCP. "
+    "Pro-forma only — does not include regulatory clearance or food-grade retrofit CapEx."
+)
+
+# ── Product Prices (top of sidebar) ────────────────────────────────────────
+_sb_hdr("Product Prices")
+phb_standard_price = st.sidebar.slider(
+    "PHB selling price ($/kg)", 1.00, 15.0, PHA_STANDARD_PRICE, 0.10,
+    key="v5_phb_price",
+)
+phbv_price = st.sidebar.slider(
+    "PHBV selling price ($/kg)", 1.00, 20.0, PHBV_PRICE, 0.10,
+    key="v5_phbv_price",
+    help="Used for the PHB/PHBV blend when PHBV co-production is OFF. When ON, the auto-scaled HV-content price takes over (unless overridden in PHBV Details).",
+)
+phb_share = st.sidebar.slider(
+    "PHB share of PHA revenue mix (%)",
+    0.0, 100.0, PHA_BLEND_STANDARD_SHARE * 100.0, 1.0,
+    key="v5_phb_share",
+) / 100.0
+hgp_selling_price = float(st.sidebar.slider(
+    "HGP selling price ($/kg)",
+    min_value=3.00, max_value=12.00,
+    value=HGP_SELLING_PRICE_DEFAULT, step=0.10,
+    key="v10_hgp_selling_price",
+    help="Active when HGP is enabled. Anchors: mycoprotein (Quorn) $6-10/kg; Solar Foods Solein single-digit $/kg target; Ritala 2017 bacterial-SCP review.",
+))
+scp_target_price = st.sidebar.slider(
+    "Feed-grade SCP selling price ($/kg)",
+    0.30, 8.00, SCP_TARGET_PRICE, 0.05,
+    key="v5_scp_price",
+    help="Active when HGP is OFF. Anchors: fishmeal $1.45-1.79/kg; Calysta FeedKind $1.50-2.00/kg; Unibio UniProtein ~$2.00/kg.",
+)
+scp_credit_price = st.sidebar.slider(
+    "Non-PHA credit price for PHA MSP ($/kg)",
+    0.10, 5.00, SCP_CREDIT_PRICE, 0.01,
+    key="v5_scp_credit",
+    help="Price used to credit the non-PHA (SCP or HGP) stream against PHA production cost in the MSP calculation.",
+)
+
+# ── PHBV Details (conditional) ─────────────────────────────────────────────
+if phbv_enabled:
+    _sb_hdr("PHBV Details")
+    _cosub_ids = list(COSUBSTRATE_PRESETS.keys())
+    _cosub_labels = [COSUBSTRATE_PRESETS[cid]["label"] for cid in _cosub_ids]
+    phbv_cosubstrate_label = st.sidebar.selectbox(
+        "PHBV co-substrate",
+        options=_cosub_labels,
+        index=0,
+        key="v9_phbv_cosubstrate",
+        help="Propionate: industry default. Valerate: highest mass-efficiency, highest cost. Levulinate: cheapest, lower incorporation yield.",
+    )
+    phbv_cosubstrate_id = _cosub_ids[_cosub_labels.index(phbv_cosubstrate_label)]
+    _cosub = COSUBSTRATE_PRESETS[phbv_cosubstrate_id]
+    phbv_hv_mol_pct = float(st.sidebar.slider(
+        "PHBV HV content (mol %)",
+        min_value=2.0,
+        max_value=float(_cosub["max_hv_mol_pct"]),
+        value=float(_cosub["default_hv_mol_pct"]),
+        step=0.5,
+        key=f"v9_phbv_hv_mol_pct_{phbv_cosubstrate_id}",
+        help="Incorporated 3-hydroxyvalerate on a molar basis. Higher HV drives higher co-substrate demand and a higher market price.",
+    ))
+    phbv_cosubstrate_kg_per_kg_hv = float(st.sidebar.slider(
+        f"{_cosub['label'].split(' (')[0]} demand (kg / kg HV incorporated)",
+        min_value=1.0,
+        max_value=6.0,
+        value=float(_cosub["kg_per_kg_hv"]),
+        step=0.1,
+        key=f"v9_phbv_cosub_ratio_{phbv_cosubstrate_id}",
+        help="Mass of co-substrate fed per kg of 3-HV actually incorporated into polymer.",
+    ))
+    phbv_cosubstrate_price = float(st.sidebar.slider(
+        f"{_cosub['label'].split(' (')[0]} cost ($/kg)",
+        min_value=0.50,
+        max_value=8.00,
+        value=float(_cosub["price_per_kg"]),
+        step=0.05,
+        key=f"v9_phbv_cosub_price_{phbv_cosubstrate_id}",
+    ))
+    _phbv_auto = phbv_auto_price(phbv_hv_mol_pct)
+    phbv_price_override = st.sidebar.checkbox(
+        f"Override auto-scaled PHBV price (auto = \\${_phbv_auto:.2f}/kg at {phbv_hv_mol_pct:.1f}% HV)",
+        value=False,
+        key="v9_phbv_price_override",
+    )
+    if phbv_price_override:
+        phbv_selling_price = float(st.sidebar.slider(
+            "PHBV selling price — manual override ($/kg)",
+            min_value=3.00, max_value=20.00, value=float(_phbv_auto), step=0.10,
+            key="v9_phbv_manual_price",
+        ))
+    else:
+        phbv_selling_price = float(_phbv_auto)
+    st.sidebar.caption(
+        f"Auto price: \\${_phbv_auto:.2f}/kg at {phbv_hv_mol_pct:.1f}% HV. "
+        "Scales 5.50 → 7 → 9 → 12 \\$/kg at 5 → 10 → 15 → 20 % HV."
+    )
+else:
+    phbv_cosubstrate_id = "propionate"
+    phbv_hv_mol_pct = COSUBSTRATE_PRESETS[phbv_cosubstrate_id]["default_hv_mol_pct"]
+    phbv_cosubstrate_kg_per_kg_hv = COSUBSTRATE_PRESETS[phbv_cosubstrate_id]["kg_per_kg_hv"]
+    phbv_cosubstrate_price = COSUBSTRATE_PRESETS[phbv_cosubstrate_id]["price_per_kg"]
+    phbv_selling_price = phbv_auto_price(phbv_hv_mol_pct)
+
+# ── HGP Details (conditional) ──────────────────────────────────────────────
+if hgp_enabled:
+    _sb_hdr("HGP Details")
+    hgp_mode_labels = {
+        "coproduction": "Co-production with polymer (PHA retained)",
+        "alone": "HGP alone (PHA knocked out)",
+    }
+    hgp_mode_ids = list(hgp_mode_labels.keys())
+    _hgp_mode_label = st.sidebar.radio(
+        "HGP production mode",
+        options=[hgp_mode_labels[mid] for mid in hgp_mode_ids],
+        index=0,
+        key="v10_hgp_production_mode",
+        help="Co-production: keep PHA, sell non-PHA as HGP. HGP-alone: phaC knockout, ~92% of biomass sold as HGP.",
+    )
+    hgp_production_mode = hgp_mode_ids[[hgp_mode_labels[mid] for mid in hgp_mode_ids].index(_hgp_mode_label)]
+    hgp_dsp_cost_per_kg = float(st.sidebar.slider(
+        "HGP DSP cost ($/kg HGP)",
+        min_value=0.50, max_value=5.00,
+        value=HGP_DSP_COST_PER_KG_DEFAULT, step=0.05,
+        key="v10_hgp_dsp_cost",
+        help="Endotoxin removal + TFF + food-grade spray drying + QA. Default $1.80/kg mid-case.",
+    ))
+    hgp_recovery_frac = float(st.sidebar.slider(
+        "HGP whole-cell recovery (fraction of non-PHA CDW)",
+        min_value=0.60, max_value=0.95,
+        value=HGP_RECOVERY_FRAC_DEFAULT, step=0.01,
+        key="v10_hgp_recovery",
+        help="Spray-dried whole-cell mash (Quorn / Solein style) recovers 80-90% of non-PHA CDW.",
+    ))
+    hgp_cp_frac = float(st.sidebar.slider(
+        "HGP crude-protein content (fraction)",
+        min_value=0.45, max_value=0.75,
+        value=HGP_CP_DEFAULT, step=0.01,
+        key="v10_hgp_cp",
+        help="Spec display only; does not feed the revenue math (pricing is per kg of mash sold).",
+    ))
+    if hgp_production_mode == "alone":
+        hgp_alone_phb_frac = float(st.sidebar.slider(
+            "HGP-alone residual PHB content (fraction)",
+            min_value=0.00, max_value=0.15,
+            value=HGP_ALONE_PHB_FRAC_DEFAULT, step=0.01,
+            key="v10_hgp_alone_phb",
+            help="Default 0% = phaCAB knockout. Raise to 5-15% to model wild-type N-replete basal PHA.",
+        ))
+    else:
+        hgp_alone_phb_frac = HGP_ALONE_PHB_FRAC_DEFAULT
+    st.sidebar.caption(
+        "Food-grade retrofit CapEx (~\\$8-15M at Phase III) not included. "
+        "Add via 'Added major CapEx' slider to stress-test."
+    )
+else:
+    hgp_production_mode = HGP_PRODUCTION_MODE_DEFAULT
+    hgp_dsp_cost_per_kg = HGP_DSP_COST_PER_KG_DEFAULT
+    hgp_recovery_frac = HGP_RECOVERY_FRAC_DEFAULT
+    hgp_cp_frac = HGP_CP_DEFAULT
+    hgp_alone_phb_frac = HGP_ALONE_PHB_FRAC_DEFAULT
+
 _sb_hdr("Fairfield Controls")
 phase_utils = {
     phase: float(
@@ -5106,236 +5285,12 @@ pha_extraction_cost_per_kg_sellable = st.sidebar.slider(
 )
 standard_n_cost_per_kg_cdw = st.sidebar.slider("Base nitrogen cost ($/kg CDW)", 0.00, 0.50, STANDARD_N_COST_PER_KG_CDW, 0.005, key="v5_n_cost")
 
-_sb_hdr("Labor + Market Inputs")
+_sb_hdr("Labor + Finance")
 phase_labor = {
     "Phase I": st.sidebar.slider("Phase I labor ($/yr)", 0.10, 5.0, PHASE_FIXED_LABOR["Phase I"] / 1e6, 0.05, format="$%.2fM", key="v5_phase1_labor") * 1e6,
     "Phase II": st.sidebar.slider("Phase II labor ($/yr)", 0.10, 8.0, PHASE_FIXED_LABOR["Phase II"] / 1e6, 0.05, format="$%.2fM", key="v5_phase2_labor") * 1e6,
     "Phase III": st.sidebar.slider("Phase III labor ($/yr)", 0.10, 12.0, PHASE_FIXED_LABOR["Phase III"] / 1e6, 0.05, format="$%.2fM", key="v5_phase3_labor") * 1e6,
 }
-phb_standard_price = st.sidebar.slider("PHB selling price ($/kg)", 1.00, 15.0, PHA_STANDARD_PRICE, 0.10, key="v5_phb_price")
-phbv_price = st.sidebar.slider("PHBV selling price ($/kg)", 1.00, 20.0, PHBV_PRICE, 0.10, key="v5_phbv_price")
-phb_share = st.sidebar.slider("PHB share of PHA revenue mix (%)", 0.0, 100.0, PHA_BLEND_STANDARD_SHARE * 100.0, 1.0, key="v5_phb_share") / 100.0
-
-_sb_hdr("PHBV Co-production (v9)")
-st.sidebar.caption(
-    "PHBV mode overrides the PHB/PHBV blend above. When ON, the entire PHA "
-    "stream is sold as PHBV at a price that scales with HV content, and a "
-    "co-substrate (propionate, valerate, or levulinate) cost line is added "
-    "to the variable cost stack. When OFF, behavior matches v8."
-)
-phbv_enabled = st.sidebar.checkbox(
-    "Enable PHBV co-production",
-    value=PHBV_ENABLED_DEFAULT,
-    key="v9_phbv_enabled",
-)
-if phbv_enabled:
-    _cosub_ids = list(COSUBSTRATE_PRESETS.keys())
-    _cosub_labels = [COSUBSTRATE_PRESETS[cid]["label"] for cid in _cosub_ids]
-    phbv_cosubstrate_label = st.sidebar.selectbox(
-        "PHBV co-substrate",
-        options=_cosub_labels,
-        index=0,
-        key="v9_phbv_cosubstrate",
-        help=(
-            "Propionate is the industry default (Doi 1988, Madison-Huisman 1999). "
-            "Valerate has the highest mass-efficiency but is the most expensive. "
-            "Levulinate is the cheapest reagent but has lower incorporation yield."
-        ),
-    )
-    phbv_cosubstrate_id = _cosub_ids[_cosub_labels.index(phbv_cosubstrate_label)]
-    _cosub = COSUBSTRATE_PRESETS[phbv_cosubstrate_id]
-    phbv_hv_mol_pct = float(st.sidebar.slider(
-        "PHBV HV content (mol %)",
-        min_value=2.0,
-        max_value=float(_cosub["max_hv_mol_pct"]),
-        value=float(_cosub["default_hv_mol_pct"]),
-        step=0.5,
-        key=f"v9_phbv_hv_mol_pct_{phbv_cosubstrate_id}",
-        help="Incorporated 3-hydroxyvalerate on a molar basis. Higher HV content drives higher co-substrate demand and a higher market price.",
-    ))
-    phbv_cosubstrate_kg_per_kg_hv = float(st.sidebar.slider(
-        f"{_cosub['label'].split(' (')[0]} demand (kg / kg HV incorporated)",
-        min_value=1.0,
-        max_value=6.0,
-        value=float(_cosub["kg_per_kg_hv"]),
-        step=0.1,
-        key=f"v9_phbv_cosub_ratio_{phbv_cosubstrate_id}",
-        help="Mass of co-substrate fed per kg of 3-HV actually incorporated into polymer. Captures both stoichiometry and respiration loss.",
-    ))
-    phbv_cosubstrate_price = float(st.sidebar.slider(
-        f"{_cosub['label'].split(' (')[0]} cost ($/kg)",
-        min_value=0.50,
-        max_value=8.00,
-        value=float(_cosub["price_per_kg"]),
-        step=0.05,
-        key=f"v9_phbv_cosub_price_{phbv_cosubstrate_id}",
-    ))
-    _phbv_auto = phbv_auto_price(phbv_hv_mol_pct)
-    phbv_price_override = st.sidebar.checkbox(
-        f"Override auto-scaled PHBV price (auto = \\${_phbv_auto:.2f}/kg at {phbv_hv_mol_pct:.1f}% HV)",
-        value=False,
-        key="v9_phbv_price_override",
-    )
-    if phbv_price_override:
-        phbv_selling_price = float(st.sidebar.slider(
-            "PHBV selling price — manual override ($/kg)",
-            min_value=3.00, max_value=20.00, value=float(_phbv_auto), step=0.10,
-            key="v9_phbv_manual_price",
-        ))
-    else:
-        phbv_selling_price = float(_phbv_auto)
-    st.sidebar.caption(
-        f"**Auto-scaled PHBV price:** \\${_phbv_auto:.2f}/kg at {phbv_hv_mol_pct:.1f}% HV. "
-        "Anchors: \\$5.50/kg at 5% HV, \\$7/kg at 10%, \\$9/kg at 15%, \\$12/kg at 20% "
-        "(Tianan Biopolymer, Kaneka PHBH, Danimer Nodax; 2023-2025 specialty-bioplastic surveys)."
-    )
-else:
-    phbv_cosubstrate_id = "propionate"
-    phbv_hv_mol_pct = COSUBSTRATE_PRESETS[phbv_cosubstrate_id]["default_hv_mol_pct"]
-    phbv_cosubstrate_kg_per_kg_hv = COSUBSTRATE_PRESETS[phbv_cosubstrate_id]["kg_per_kg_hv"]
-    phbv_cosubstrate_price = COSUBSTRATE_PRESETS[phbv_cosubstrate_id]["price_per_kg"]
-    phbv_selling_price = phbv_auto_price(phbv_hv_mol_pct)
-
-# ── v10 human-grade SCP (HGP) ──────────────────────────────────────────────
-_sb_hdr("Human-grade SCP (v10)")
-st.sidebar.caption(
-    "HGP mode re-prices and re-costs the non-PHA fraction of CDW as human-grade "
-    "whole-cell protein mash instead of feed-grade SCP. When OFF, the model "
-    "behaves exactly like v9. Regulatory caveat: _C. necator_ H16 has a mixed "
-    "regulatory footprint (EFSA QPS \"production purposes only\"; PHA polymer "
-    "holds FDA FCNs including Kaneka FCN 1835) but the biomass itself does not "
-    "hold a US GRAS notice or an EFSA Novel Food authorisation as a food "
-    "ingredient. Solar Foods' Solein (a _Xanthobacter_-group organism, not "
-    "_C. necator_) holds Singapore novel-food approval (2022) and US "
-    "self-affirmed GRAS (2024); these clearances do not extend to a new "
-    "_C. necator_ HGP. US GRAS / EFSA Novel Food dossiers run 2-3 years once "
-    "toxicology, allergenicity, and compositional packages are in hand. Treat "
-    "HGP economics as pro-forma pending that clearance."
-)
-hgp_enabled = st.sidebar.checkbox(
-    "Enable human-grade SCP (HGP)",
-    value=HGP_ENABLED_DEFAULT,
-    key="v10_hgp_enabled",
-)
-if hgp_enabled:
-    hgp_mode_labels = {
-        "coproduction": "Co-production with polymer (PHA retained)",
-        "alone": "HGP alone (minimize PHA, N-replete growth)",
-    }
-    hgp_mode_ids = list(hgp_mode_labels.keys())
-    _hgp_mode_label = st.sidebar.radio(
-        "HGP production mode",
-        options=[hgp_mode_labels[mid] for mid in hgp_mode_ids],
-        index=0,
-        key="v10_hgp_production_mode",
-        help=(
-            "Co-production keeps the PHA stream (and PHBV if enabled) unchanged "
-            "from v9; the non-PHA fraction of CDW is simply sold as HGP. "
-            "HGP-alone operates the fermenter N-replete to suppress PHA "
-            "accumulation; PHB content is forced to a basal level (~8%) and "
-            "~92% of CDW is sold as HGP."
-        ),
-    )
-    hgp_production_mode = hgp_mode_ids[[hgp_mode_labels[mid] for mid in hgp_mode_ids].index(_hgp_mode_label)]
-    hgp_selling_price = float(st.sidebar.slider(
-        "HGP selling price ($/kg)",
-        min_value=3.00, max_value=12.00,
-        value=HGP_SELLING_PRICE_DEFAULT, step=0.10,
-        key="v10_hgp_selling_price",
-        help=(
-            "Mid-band default $8/kg. Anchors: ingredient-grade mycoprotein (Quorn) "
-            "$6-10/kg per 2024-25 food-ingredient trade surveys (Finnigan 2019 is "
-            "the nutritional-profile reference, not a price source); Solar Foods "
-            "Solein single-digit USD/kg dry-protein production-cost target at "
-            "Factory 01 scale; Ritala 2017 bacterial-SCP review. Calysta FeedKind "
-            "is feed-grade only and is NOT used as an HGP-price anchor."
-        ),
-    ))
-    hgp_dsp_cost_per_kg = float(st.sidebar.slider(
-        "HGP DSP cost ($/kg HGP)",
-        min_value=0.50, max_value=5.00,
-        value=HGP_DSP_COST_PER_KG_DEFAULT, step=0.05,
-        key="v10_hgp_dsp_cost",
-        help=(
-            "Internal bottom-up engineering estimate for a spray-dried whole-cell "
-            "mash flowsheet. Decomposition: endotoxin (LPS) removal via thermal "
-            "inactivation + TFF (~$1.05/kg HGP) + food-grade spray drying and "
-            "sanitary packaging (~$0.50/kg HGP) + release QA / regulatory overhead "
-            "($0.20-0.40/kg). Default $1.80/kg is the mid-case."
-        ),
-    ))
-    hgp_recovery_frac = float(st.sidebar.slider(
-        "HGP whole-cell recovery (fraction of non-PHA CDW)",
-        min_value=0.60, max_value=0.95,
-        value=HGP_RECOVERY_FRAC_DEFAULT, step=0.01,
-        key="v10_hgp_recovery",
-        help=(
-            "Spray-dried whole-cell mash (Quorn / Solein style) recovers 80-90% of "
-            "the non-PHA CDW. Feed-grade pelletized SCP is ~78% for reference. "
-            "Lower values reflect tighter endotoxin / QA specs."
-        ),
-    ))
-    hgp_cp_frac = float(st.sidebar.slider(
-        "HGP crude-protein content (fraction)",
-        min_value=0.45, max_value=0.75,
-        value=HGP_CP_DEFAULT, step=0.01,
-        key="v10_hgp_cp",
-        help=(
-            "Whole-cell bacterial SCP typically assays 55-75% crude protein "
-            "(Ritala 2017 review of bacterial / single-cell protein). Displayed "
-            "for spec transparency; does not directly feed the revenue math "
-            "because pricing is per kg of mash sold."
-        ),
-    ))
-    if hgp_production_mode == "alone":
-        hgp_alone_phb_frac = float(st.sidebar.slider(
-            "HGP-alone residual PHB content (fraction)",
-            min_value=0.00, max_value=0.15,
-            value=HGP_ALONE_PHB_FRAC_DEFAULT, step=0.01,
-            key="v10_hgp_alone_phb",
-            help=(
-                "Default 0% assumes a phaCAB knockout strain: deletion of the PHB "
-                "synthase (phaC) in C. necator H16 abolishes PHA accumulation "
-                "entirely (polymer-negative phenotype reported by Slater 1988 and "
-                "Peoples & Sinskey 1989; phaCAB operon mapped in Pohlmann 2006). "
-                "Raise the slider to model the wild-type N-replete case where basal "
-                "PHA accumulates to 5-15% of CDW even without deliberate "
-                "N-limitation (Braunegg 1998, Khanna 2005)."
-            ),
-        ))
-    else:
-        hgp_alone_phb_frac = HGP_ALONE_PHB_FRAC_DEFAULT
-    st.sidebar.caption(
-        f"**HGP base case:** \\${hgp_selling_price:.2f}/kg selling price, "
-        f"\\${hgp_dsp_cost_per_kg:.2f}/kg DSP, {hgp_recovery_frac * 100:.0f}% "
-        f"recovery, {hgp_cp_frac * 100:.0f}% crude protein. "
-        "Facility CapEx for the HGP retrofit (endotoxin skid, sanitary spray drier, "
-        "GFSI compliance) is **not** auto-added; users who want to stress-test "
-        "the food-grade retrofit should bump the 'Added major CapEx' slider by a "
-        "literature-anchored \\$8-15M at Phase III."
-    )
-else:
-    hgp_production_mode = HGP_PRODUCTION_MODE_DEFAULT
-    hgp_selling_price = HGP_SELLING_PRICE_DEFAULT
-    hgp_dsp_cost_per_kg = HGP_DSP_COST_PER_KG_DEFAULT
-    hgp_recovery_frac = HGP_RECOVERY_FRAC_DEFAULT
-    hgp_cp_frac = HGP_CP_DEFAULT
-    hgp_alone_phb_frac = HGP_ALONE_PHB_FRAC_DEFAULT
-
-scp_target_price = st.sidebar.slider(
-    "Feed-grade SCP selling price ($/kg)",
-    0.30, 8.00, SCP_TARGET_PRICE, 0.05,
-    key="v5_scp_price",
-)
-st.sidebar.caption(
-    "**Market price, not MSP.** Default \\$2.00/kg is the upper end of the "
-    "feed-grade bacterial-SCP benchmark band: fishmeal \\$1.45-1.79/kg (FRED "
-    "PFISHUSDM 2024-2025), Calysta FeedKind \\$1.50-2.00/kg (Rabobank / "
-    "Aquafeed), Unibio UniProtein ~\\$2.00/kg. The MSP reported above is the "
-    "project's computed cost floor; market price minus MSP is the operating "
-    "margin per kg of SCP sold."
-)
-scp_credit_price = st.sidebar.slider("SCP credit price for PHA MSP ($/kg)", 0.10, 5.00, SCP_CREDIT_PRICE, 0.01, key="v5_scp_credit")
 discount_rate = st.sidebar.slider("Discount rate (%)", 1.0, 30.0, DISCOUNT_RATE * 100.0, 1.0, key="v5_discount_rate") / 100.0
 npv_years = int(st.sidebar.slider("NPV / IRR horizon (years)", 3, 30, NPV_YEARS, 1, key="v5_npv_years"))
 
