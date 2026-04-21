@@ -4318,362 +4318,589 @@ def fig_v10_dsp_stack(
     return fig
 
 
-V5_FIGURE_FORMULAS: Dict[str, str] = {
-    "Phase Output": (
-        "**What the figure shows.** Stacked bars of annual sellable PHA (blue) and annual sellable feed-"
-        "grade SCP (orange) for S1 and S2 at Phase I (50 kL) / II (150 kL) / III (400 kL). Tonnage is "
-        "*sellable* product, not raw fermentation mass.\n\n"
-        "**Core equations (continuous mode):**\n"
-        "```\n"
-        "V_util      = V_installed * (U / 100)\n"
-        "N_turnover  = 8760 h/yr * UPTIME / HRT        (= 8760 * 0.85 / 24 = 310.25 / yr)\n"
-        "M_CDW       = V_util * (T_CDW / 1000) * N_turnover       [kg/yr]\n"
-        "M_PHA_sell  = M_CDW * f_PHB * 0.88 * 0.95                [kg/yr]\n"
-        "M_SCP_sell  = M_CDW * (1 - f_PHB) * 0.85 * 0.92          [kg/yr]\n"
-        "```\n\n"
-        "**Variable map (sidebar / engine):**\n"
-        "- `V_installed` = vessel volume per phase: 50,000 / 150,000 / 400,000 L.\n"
-        "- `U` = utilization (%). Default: 90% at every phase (`v5_phase3_util` etc.).\n"
-        "- `HRT` = continuous residence time = 24 h (`CONTINUOUS_HRT_H`).\n"
-        "- `UPTIME` = 0.85 (`UPTIME_FRACTION`, Fairfield handoff confirmed).\n"
-        "- `T_CDW` = CDW titer in g/L (sidebar slider, S1/S2 default 60 g/L).\n"
-        "- `f_PHB` = PHB content fraction of CDW (sidebar, S1/S2 default 0.60).\n"
-        "- `0.88 * 0.95` = PHA extraction recovery × dry-basis factor (`_sellable_pha_kg`).\n"
-        "- `0.85 * 0.92` = SCP biomass recovery × dry-basis factor (`_sellable_scp_kg`).\n\n"
-        "**Worked example: Phase III S1, defaults.**\n"
-        "```\n"
-        "V_util      = 400,000 * 0.90                   = 360,000 L\n"
-        "M_CDW       = 360,000 * 0.060 * 310.25         = 6,701,400 kg/yr = 6,701 t/y\n"
-        "M_PHA_sell  = 6,701,400 * 0.60 * 0.88 * 0.95   = 3,363,342 kg/yr ≈ 3,363 t/y\n"
-        "M_SCP_sell  = 6,701,400 * 0.40 * 0.85 * 0.92   = 2,096,118 kg/yr ≈ 2,096 t/y\n"
-        "```"
-    ),
-    "MSP and Cash Flow": (
-        "**What the figure shows.** Left panel: PHA MSP with SCP credit, $/kg PHA, for all "
-        "phase × scenario points. Right panel: annual cash flow, $M/yr, same points.\n\n"
-        "**Left-panel equation.**\n"
-        "```\n"
-        "C_total    = C_sub + C_pretr + C_N + C_elec + C_steam + C_ext\n"
-        "           + C_dsp + C_cip + C_labor + C_capex_ann\n"
-        "credit_SCP = M_SCP_sell * P_SCP_credit\n"
-        "MSP_PHA    = (C_total - credit_SCP) / M_PHA_sell          [$/kg PHA]\n"
-        "```\n"
-        "If `M_PHA_sell <= 1 kg` (HGP-alone / phaCAB knockout), MSP is rendered N/A instead of a large "
-        "negative number (see `_fairfield_single_result`).\n\n"
-        "**Right-panel equation.**\n"
-        "```\n"
-        "Rev_total  = M_PHA_sell * P_PHA_blend + M_SCP_sell * P_SCP_sell\n"
-        "CF_annual  = Rev_total - (C_total - C_capex_ann)          [$/yr]\n"
-        "```\n"
-        "Cash flow adds annualized CapEx back because CapEx is captured once as an upfront investment in "
-        "the NPV/IRR finance layer.\n\n"
-        "**Variable map.**\n"
-        "- `P_PHA_blend` = blended PHA price (sidebar PHB price × PHB share + PHBV price × PHBV share). "
-        "Defaults to 0.70 × $5.50 + 0.30 × $7.00 = $5.95/kg.\n"
-        "- `P_SCP_sell`  = SCP selling price slider (default $2.00/kg).\n"
-        "- `P_SCP_credit`= SCP credit slider (separate from sell price; default $2.00/kg).\n"
-        "- Every `C_*` term is defined under the **Cost Structure** figure below."
-    ),
-    "Returns by Phase": (
-        "**What the figure shows.** 2 × 2 grid of finance metrics (NPV, IRR, simple payback, annual "
-        "cash flow) across Phase I / II / III for S1 and S2.\n\n"
-        "**Core equations.**\n"
-        "```\n"
-        "CapEx_0    = CapEx_acquisition + CapEx_major_added       [$, upfront]\n"
-        "CRF(r, N)  = r * (1 + r)^N / ((1 + r)^N - 1)\n"
-        "C_capex_ann= CapEx_0 * CRF(r, N)                          [$/yr, embedded in C_total]\n"
-        "CF_annual  = Rev_total - (C_total - C_capex_ann)\n"
-        "NPV        = -CapEx_0 + sum_{t=1..N} CF_annual / (1 + r)^t\n"
-        "IRR        s.t.  0 = -CapEx_0 + sum_{t=1..N} CF_annual / (1 + IRR)^t\n"
-        "Payback    = CapEx_0 / CF_annual          (NaN if CF_annual <= 0)\n"
-        "```\n\n"
-        "**Variable map.**\n"
-        "- `r` = discount rate slider (default 0.09, Fairfield handoff confirmed).\n"
-        "- `N` = NPV horizon slider (default 10 years).\n"
-        "- `CapEx_0` default is $0 (both acquisition and added-major-CapEx sliders start at $0). "
-        "Move the Acquisition slider to $45M to include the site purchase; move the Added Major CapEx "
-        "slider to model DSP retrofit, food-grade retrofit, etc.\n"
-        "- IRR solver = Newton–Raphson in `_compute_irr`; returns NaN if cash flows never cross zero."
-    ),
-    "S1 vs S2 Across Phases": (
-        "**What the figure shows.** 3-panel investor-memo grouped bar chart. Left: annual revenue. "
-        "Middle: annual cash flow. Right: 10-year NPV. Each panel compares S1 and S2 at Phase I / II / III.\n\n"
-        "**Core equations (per phase × scenario).**\n"
-        "```\n"
-        "Rev_PHA    = M_PHA_sell * P_PHA_effective\n"
-        "Rev_nonPHA = M_SCP_sell * P_SCP_sell      (HGP off)\n"
-        "           OR M_HGP_sell * P_HGP          (HGP on)\n"
-        "Rev_total  = Rev_PHA + Rev_nonPHA\n"
-        "CF_annual  = Rev_total - (C_total - C_capex_ann)\n"
-        "NPV        = -CapEx_0 + sum_{t=1..N} CF_annual / (1 + r)^t\n"
-        "```\n\n"
-        "**PHA price routing.**\n"
-        "```\n"
-        "P_PHA_effective = P_PHBV(x_HV_mol)        if PHBV toggle ON\n"
-        "                = P_PHA_blend             otherwise\n"
-        "```\n"
-        "`P_PHBV(x_HV_mol)` is the piecewise-linear auto price: $5.50/kg at 5% HV, $7 at 10%, $9 at 15%, "
-        "$12 at 20% (`phbv_auto_price`). Override manually in the sidebar to force a specific PHBV price.\n\n"
-        "**Why S1 and S2 have identical PHA/SCP tonnage at v9+v10 defaults.** `T_CDW` and `f_PHB` are "
-        "shared across S1 and S2; only costs differ (S2 pays DLP pretreatment on the DLP fraction and "
-        "picks up a galactose-uptake yield penalty, but gains a larger nitrogen reduction and a slightly "
-        "higher carbon recovery). Top-line revenue therefore coincides; the bars diverge only on the "
-        "cost-side panels."
-    ),
-    "NPV vs Selling Price": (
-        "**What the figure shows.** 10-year NPV as the PHA selling price sweeps across a grid (default "
-        "$2–$12/kg in 25 steps). One curve per scenario at the selected `focus_phase`. The x-intercept "
-        "is the NPV-breakeven PHA price.\n\n"
-        "**Per-price-point equation.**\n"
-        "```\n"
-        "Rev_total(P)   = M_PHA_sell * P + M_SCP_sell * P_SCP_sell\n"
-        "CF_annual(P)   = Rev_total(P) - (C_total - C_capex_ann)\n"
-        "NPV(P)         = -CapEx_0 + sum_{t=1..N} CF_annual(P) / (1 + r)^t\n"
-        "```\n"
-        "`C_total` is recomputed at the fixed `focus_phase`; only `P` varies along the x-axis. The SCP "
-        "stream stays at `P_SCP_sell` regardless, so this is specifically a PHA-price sensitivity.\n\n"
-        "**Breakeven.** `P_breakeven_PHA` is the x-axis value at which `NPV(P) = 0`. Because NPV is "
-        "linear in `P` at fixed `P_SCP_sell`, the line is a straight line in this plot."
-    ),
-    "IRR vs Selling Price": (
-        "**What the figure shows.** Same PHA-price grid as the NPV figure, but the y-axis is IRR.\n\n"
-        "**Per-price-point calculation.**\n"
-        "```\n"
-        "CF_annual(P)   = Rev_total(P) - (C_total - C_capex_ann)\n"
-        "Solve:  0 = -CapEx_0 + sum_{t=1..N} CF_annual(P) / (1 + IRR)^t\n"
-        "        with IRR bracketed in [-0.99, 10.0] via Newton–Raphson (_compute_irr).\n"
-        "```\n\n"
-        "**Edge cases.**\n"
-        "- If `CapEx_0 = 0`, the IRR is undefined (every positive cash flow gives infinite IRR). The "
-        "chart shows a plain-text note in that case instead of drawing a line.\n"
-        "- If `CF_annual(P) < 0` across the full grid, the solver returns NaN and the curve is clipped.\n\n"
-        "Higher curves mean the scenario clears investor hurdle rates (8% / 15% / 25% reference lines) "
-        "at lower selling prices."
-    ),
-    "Cost Structure": (
-        "**What the figure shows.** Horizontal bar chart of the ten annual cost buckets for the current "
-        "`focus_phase` × `focus_scenario`, in $M/yr. The sum equals `C_total`.\n\n"
-        "**Bucket definitions (engine code `_fairfield_single_result`).**\n"
-        "```\n"
-        "M_sugar     = M_CDW / (Y_CDW_sugar * eps_C)                    [kg sugar/yr]\n"
-        "C_sub       = M_sugar * (s_JB * P_JB_sugar + s_DLP * P_DLP_sugar)\n"
-        "C_pretr     = M_sugar * (s_JB * c_JB_pretr + s_DLP * c_DLP_pretr)\n"
-        "C_N         = M_CDW * c_N_standard * (1 - f_N_reduction)\n"
-        "C_elec      = M_CDW * E_kWh_per_kg * P_elec\n"
-        "C_steam     = M_CDW * c_steam_per_kg\n"
-        "C_ext       = M_PHA_sell * c_ext_per_kg_PHA\n"
-        "C_dsp       = M_CDW * c_dsp_per_kg\n"
-        "C_cip       = M_CDW * c_cip_per_kg\n"
-        "C_labor     = PHASE_FIXED_LABOR[phase]           (0.45 / 1.10 / 2.00 $M/yr)\n"
-        "C_capex_ann = (CapEx_acq + CapEx_added) * CRF(r, N)\n"
-        "```\n\n"
-        "**Unit-cost defaults (all from the Fairfield handoff, Table 11):**\n"
-        "- `P_JB_sugar` = $0.110/kg sugar; `P_DLP_sugar` = $0.125/kg sugar.\n"
-        "- `c_JB_pretr` = $0.038/kg sugar (invertase 0.015 + pH 0.004 + filtration 0.007 + HTST 0.012).\n"
-        "- `c_DLP_pretr` = $0.004/kg sugar (pH + dilution only).\n"
-        "- `c_N_standard` = $0.068/kg CDW (IMARC (NH4)2SO4 2025, back-calculated).\n"
-        "- `E_kWh_per_kg` = 1.768 kWh/kg CDW; `P_elec` = $0.12/kWh (AB InBev PPA).\n"
-        "- `c_steam_per_kg` = $0.160/kg CDW; `c_dsp_per_kg` = $0.420/kg CDW; `c_cip_per_kg` = $0.177/kg CDW.\n"
-        "- `c_ext_per_kg_PHA` = $0.638/kg sellable PHA.\n\n"
-        "**Worked example: Phase III S1, defaults, 60 g/L, 60% PHB.**\n"
-        "```\n"
-        "M_sugar    = 6,701,400 / (0.50 * 0.90)  = 14,892,000 kg/yr\n"
-        "C_sub      = 14,892,000 * 0.110         = $1.64 M/yr\n"
-        "C_pretr    = 14,892,000 * 0.038         = $0.57 M/yr\n"
-        "C_N        = 6,701,400 * 0.068 * 0.50   = $0.23 M/yr\n"
-        "C_elec     = 6,701,400 * 1.768 * 0.12   = $1.42 M/yr\n"
-        "C_steam    = 6,701,400 * 0.160          = $1.07 M/yr\n"
-        "C_ext      = 3,363,342 * 0.638          = $2.15 M/yr\n"
-        "C_dsp      = 6,701,400 * 0.420          = $2.81 M/yr\n"
-        "C_cip      = 6,701,400 * 0.177          = $1.19 M/yr\n"
-        "C_labor    = fixed                      = $2.00 M/yr\n"
-        "C_capex_ann= $0 (at default sliders)    = $0.00 M/yr\n"
-        "-----------------------------------------------\n"
-        "C_total                                 ≈ $13.08 M/yr\n"
-        "```"
-    ),
-    "Discounted Cash Flow": (
-        "**What the figure shows.** Cumulative discounted cash flow over the project horizon for the "
-        "selected `focus_phase` × `focus_scenario`. The curve crosses zero at the *discounted* payback "
-        "year (not the simple payback year).\n\n"
-        "**Recurrence.**\n"
-        "```\n"
-        "DCF(0)   = -CapEx_0\n"
-        "DCF(t)   = DCF(t-1) + CF_annual / (1 + r)^t        for t = 1 ... N\n"
-        "```\n\n"
-        "**Variable map.**\n"
-        "- `CapEx_0` = acquisition slider + added major CapEx slider (default $0 — move the sliders to "
-        "see a real payback curve).\n"
-        "- `CF_annual` = the same annual cash flow used in the NPV equation, held constant across years "
-        "(no year-over-year ramp built in — year-1 capacity ramp would be a manual slider edit).\n"
-        "- `r` = discount-rate slider (default 0.09); `N` = NPV-horizon slider (default 10).\n\n"
-        "**Sanity check.** At t = N the curve equals `NPV` exactly, which is how the NPV vs Selling "
-        "Price figure and this figure reconcile numerically."
-    ),
-    "Feedstock Sensitivity": (
-        "**What the figure shows.** A targeted three-point sensitivity on feedstock cost only, because "
-        "the Jelly Belly HPLC sugar assay is the largest open data gap.\n\n"
-        "**Per-case calculation.** For each multiplier `k ∈ {0.8, 1.0, 1.2}` and each scenario:\n"
-        "```\n"
-        "P_JB_sugar(k)   = k * P_JB_sugar_base\n"
-        "c_JB_pretr(k)   = k * c_JB_pretr_base\n"
-        "C_sub(k)        = M_sugar * (s_JB * P_JB_sugar(k) + s_DLP * P_DLP_sugar)\n"
-        "C_pretr(k)      = M_sugar * (s_JB * c_JB_pretr(k) + s_DLP * c_DLP_pretr)\n"
-        "(all other cost buckets unchanged)\n"
-        "credit_SCP      = M_SCP_sell * P_SCP_credit\n"
-        "MSP_PHA(k)      = (C_total(k) - credit_SCP) / M_PHA_sell\n"
-        "```\n\n"
-        "Only the Jelly Belly sugar price and Jelly Belly pretreatment cost are perturbed — DLP "
-        "pretreatment and DLP sugar price are held fixed, so Scenario 2 shows a smaller swing than "
-        "Scenario 1 (the DLP fraction is insulated from the ±20% JB sweep).\n\n"
-        "**Interpretation.** This is a targeted composition-risk check, not a full tornado. See the "
-        "**OAT Sensitivity** figure for the full one-at-a-time sweep."
-    ),
-    "OAT Sensitivity": (
-        "**What the figure shows.** One-at-a-time (OAT) tornado of `MSP_PHA_with_SCP_credit` for the "
-        "`focus_phase` × `focus_scenario` combination.\n\n"
-        "**Algorithm.**\n"
-        "```\n"
-        "MSP_base = (C_total - credit_SCP) / M_PHA_sell            (current sliders)\n"
-        "for each input x in OAT_INPUTS:\n"
-        "    for delta in [-0.20, +0.20]:\n"
-        "        overrides[x]  = x_base * (1 + delta)\n"
-        "        recompute _fairfield_single_result(overrides)\n"
-        "        MSP(x, delta) = (C_total' - credit_SCP') / M_PHA_sell'\n"
-        "    bar(x) spans [MSP(x, -0.20), MSP(x, +0.20)] around MSP_base\n"
-        "```\n\n"
-        "**Inputs perturbed (OAT_INPUTS).**\n"
-        "- `Y_CDW_sugar` (yield, kg CDW / kg sugar)\n"
-        "- `T_CDW` (CDW titer)\n"
-        "- `f_PHB` (PHB content of CDW)\n"
-        "- `eps_C` (carbon recovery)\n"
-        "- `P_elec` (electricity price)\n"
-        "- blended feedstock sugar price (JB × share + DLP × share)\n"
-        "- blended pretreatment cost\n"
-        "- `f_N_reduction` (nitrogen-reduction fraction)\n"
-        "- `C_labor` (fixed labor, $M/yr)\n"
-        "- `CapEx_acq` (acquisition cost slider)\n"
-        "- `r` (discount rate)\n\n"
-        "Bar length is the MSP spread at ±20%. Longer bar = more leverage on unit economics. Bars are "
-        "sorted by absolute spread so the most-impactful input sits on top."
-    ),
-    "Phase III Headline (v10, three modes)": (
-        "**What the figure shows.** 3-panel headline for Phase III only: annual revenue, annual cash "
-        "flow, 10-year NPV. Each panel has 6 bars (three HGP modes × {S1, S2}).\n\n"
-        "**Three HGP modes.**\n"
-        "```\n"
-        "off            : hgp_enabled=False\n"
-        "                 -> Rev_nonPHA = M_SCP_sell * P_SCP_sell,  C_HGP_dsp = 0\n"
-        "co-production  : hgp_enabled=True, mode='coproduction'\n"
-        "                 -> M_HGP_sell = M_CDW * (1 - f_PHB) * eta_HGP\n"
-        "                    Rev_nonPHA = M_HGP_sell * P_HGP\n"
-        "                    C_HGP_dsp  = M_HGP_sell * c_HGP_dsp\n"
-        "alone          : hgp_enabled=True, mode='alone'\n"
-        "                 -> f_PHB      := HGP_ALONE_PHB_FRAC_DEFAULT (default 0.00, phaCAB KO)\n"
-        "                    M_HGP_sell = M_CDW * (1 - f_PHB) * eta_HGP\n"
-        "                    M_PHA_sell = 0  (MSPs flagged N/A)\n"
-        "```\n\n"
-        "**Variable map.**\n"
-        "- `eta_HGP` = 0.85 (`HGP_RECOVERY_FRAC_DEFAULT`, whole-cell mash recovery).\n"
-        "- `P_HGP`   = HGP selling price slider (default $8/kg).\n"
-        "- `c_HGP_dsp` = HGP DSP cost slider (default $1.80/kg HGP).\n\n"
-        "**Worked example: Phase III S1 co-production, defaults.**\n"
-        "```\n"
-        "M_HGP_sell = 6,701,400 * 0.40 * 0.85       = 2,278,476 kg/yr ≈ 2,278 t/y\n"
-        "Rev_nonPHA = 2,278,476 * 8                 = $18.23 M/yr     (vs $4.19 M SCP @ $2)\n"
-        "C_HGP_dsp  = 2,278,476 * 1.80              = $4.10 M/yr\n"
-        "```\n"
-        "**HGP-alone example (S1, f_PHB = 0).**\n"
-        "```\n"
-        "M_HGP_sell = 6,701,400 * 1.00 * 0.85       = 5,696,190 kg/yr ≈ 5,696 t/y\n"
-        "Rev_nonPHA = 5,696,190 * 8                 = $45.57 M/yr      (single product)\n"
-        "```"
-    ),
-    "Product Slate by Mode (Phase III)": (
-        "**What the figure shows.** Stacked mass-flow bar chart for Phase III S1, one bar per HGP mode "
-        "(off / co-production / alone). Bar segments are annual sellable PHA, feed-grade SCP, and HGP "
-        "whole-cell mash in tonnes/yr.\n\n"
-        "**Per-mode formulas.**\n"
-        "```\n"
-        "off           :  M_PHA_sell = M_CDW * f_PHB * 0.88 * 0.95\n"
-        "                 M_SCP_sell = M_CDW * (1 - f_PHB) * 0.85 * 0.92\n"
-        "                 M_HGP_sell = 0\n"
-        "co-production :  M_PHA_sell = M_CDW * f_PHB * 0.88 * 0.95\n"
-        "                 M_SCP_sell = 0\n"
-        "                 M_HGP_sell = M_CDW * (1 - f_PHB) * eta_HGP\n"
-        "alone         :  f_PHB      := 0 (default, phaCAB KO)\n"
-        "                 M_PHA_sell = 0\n"
-        "                 M_SCP_sell = 0\n"
-        "                 M_HGP_sell = M_CDW * eta_HGP\n"
-        "```\n"
-        "Totals printed above each bar are (sum of the three streams) in t/y. Because recoveries differ "
-        "across streams, the total does **not** equal `M_CDW` — it equals the mass that leaves the DSP "
-        "train packaged for sale."
-    ),
-    "HGP Price Sensitivity": (
-        "**What the figure shows.** 10-year NPV at Phase III as the HGP selling price `P_HGP` sweeps "
-        "$3–$12/kg (25 steps). Four curves: co-production S1, co-production S2, HGP-alone S1, HGP-alone "
-        "S2. Vertical line marks the current `P_HGP` slider value. Shaded bands are commercial price "
-        "envelopes.\n\n"
-        "**Per-price-point equation (co-production arm).**\n"
-        "```\n"
-        "Rev_total(P_HGP)  = M_PHA_sell * P_PHA_effective + M_HGP_sell * P_HGP\n"
-        "C_HGP_dsp         = M_HGP_sell * c_HGP_dsp            (also scales with M_HGP_sell, not with P_HGP)\n"
-        "CF_annual(P_HGP)  = Rev_total(P_HGP) - (C_total(P_HGP) - C_capex_ann)\n"
-        "NPV(P_HGP)        = -CapEx_0 + sum_{t=1..N} CF_annual(P_HGP) / (1 + r)^t\n"
-        "```\n"
-        "Only `P_HGP` varies along the x-axis. `M_HGP_sell`, `C_HGP_dsp`, and every non-HGP cost bucket "
-        "are held constant, so NPV is linear in `P_HGP` (straight line) for each curve.\n\n"
-        "**HGP-alone arm.** Same equation but with `f_PHB = 0` (default) and `M_PHA_sell = 0`, so "
-        "Rev_total collapses to `M_HGP_sell * P_HGP`.\n\n"
-        "**Price-band shading.**\n"
-        "- $3–$6/kg   : Solein (Solar Foods) dry-protein production-cost floor.\n"
-        "- $6–$10/kg  : Quorn mycoprotein and Solein mid-band ingredient pricing.\n"
-        "- $10–$12/kg : branded specialty / premium food-ingredient off-take."
-    ),
-    "P&L Waterfall": (
-        "**What the figure shows.** Annual P&L walk from revenue to cash flow for the current "
-        "`focus_phase` × `focus_scenario`. Green bar = revenue, red bars = cost buckets, blue bar = "
-        "residual cash flow. The dynamic revenue label reads *Revenue (PHA+SCP)*, *Revenue (PHA+HGP)*, "
-        "or *Revenue (HGP)* based on the current slate.\n\n"
-        "**Bucket equation.**\n"
-        "```\n"
-        "CF_annual = Rev_total\n"
-        "          - C_sub - C_pretr - C_N - C_elec - C_steam\n"
-        "          - C_ext - C_dsp - C_HGP_dsp - C_cip - C_labor\n"
-        "```\n"
-        "Note: `C_capex_ann` is **not** subtracted in the waterfall (it belongs to the NPV/IRR finance "
-        "layer, not to operating cash flow), so the blue bar equals `CF_annual` in every finance figure.\n\n"
-        "**Bar-value formulas.** Every red bar is one of the `C_*` buckets defined under the "
-        "**Cost Structure** figure above, divided by 1e6 to display in $M/yr. Green and blue bars are "
-        "`Rev_total / 1e6` and `CF_annual / 1e6` respectively.\n\n"
-        "**Sanity check.** At default Phase III S1 settings, Rev_total ≈ $24.2M, sum of red bars "
-        "≈ $13.0M, blue bar ≈ $11.2M — matches the numbers on the MSP and Cash Flow figure."
-    ),
-    "DSP Cost Stack": (
-        "**What the figure shows.** Two stacked bars of downstream-processing cost, $/kg of *non-PHA* "
-        "sellable product. Left bar = feed-grade SCP train; right bar = HGP whole-cell mash train.\n\n"
-        "**Left bar (feed-grade SCP), fixed engineering split.**\n"
-        "```\n"
-        "centrifuge + spray-dry + pelletize + CIP  = $0.60/kg SCP (all-in)\n"
-        "```\n"
-        "This number is part of the CDW-wide `c_dsp_per_kg` ($0.420/kg CDW) in the main engine — the SCP "
-        "figure here is an engineering breakdown, not a separate cost line the engine bills against "
-        "revenue.\n\n"
-        "**Right bar (HGP whole-cell mash), scaled to match the slider.**\n"
-        "```\n"
-        "Let S = c_HGP_dsp slider value ($/kg HGP).\n"
-        "TFF endotoxin reduction        = S * (1.05 / 1.80)\n"
-        "food-grade spray dry           = S * (0.50 / 1.80)\n"
-        "polymyxin-B polish + release QA= S * (0.25 / 1.80)\n"
-        "-----------------------------------------------------\n"
-        "Total                          = S (by construction)\n"
-        "```\n"
-        "The three segment weights come from the engineering build-up used to justify the $1.80/kg "
-        "default (LPS reduction ~$1.05, spray drying ~$0.50, QA/polish ~$0.25). Moving the `c_HGP_dsp` "
-        "slider rescales all three segments proportionally so the total always equals the slider value, "
-        "which is the number the engine uses for `C_HGP_dsp = M_HGP_sell × c_HGP_dsp`."
-    ),
+# Each entry is a list of rendering segments.  Segment kinds:
+#   ("p", markdown_text)         - a markdown paragraph (prose, rendered via st.markdown;
+#                                   `$` is escaped to `\$` so it renders as currency, not
+#                                   as a LaTeX math delimiter)
+#   ("latex", latex_body)        - a display-mode LaTeX equation (rendered via st.latex)
+#   ("bullets", [str, str, ...]) - a markdown bullet list; same `$` escaping as "p"
+#
+# The goal is to explain each figure in plain English for a non-coder, using
+# real mathematical formulas and named data inputs rather than pseudocode.
+V5_FIGURE_FORMULAS: Dict[str, List[Tuple[str, Any]]] = {
+    "Phase Output": [
+        ("p",
+         "**What the figure shows.** Two panels, one per scenario. Each bar stacks blue PHA sold per "
+         "year on top of orange feed-grade SCP sold per year. The x-axis steps through Phase I "
+         "(50,000 L of installed vessel volume), Phase II (150,000 L), and Phase III (400,000 L). "
+         "These are *sellable* tonnages, already net of downstream losses."),
+        ("p",
+         "**The math, in plain language.** Three multiplications turn vessel capacity into biomass, "
+         "and two more turn biomass into packaged product:"),
+        ("latex",
+         r"\text{Annual biomass} \;=\; \text{Vessel volume} \;\times\; \text{Utilization} "
+         r"\;\times\; \frac{\text{Titer}}{1000} \;\times\; \text{Turnovers per year}"),
+        ("p",
+         "The turnovers-per-year term is how many times a continuous fermenter replaces its working "
+         "volume over a year, accounting for planned downtime:"),
+        ("latex",
+         r"\text{Turnovers per year} \;=\; "
+         r"\frac{8{,}760 \text{ h/yr} \;\times\; 85\%\ \text{uptime}}{24 \text{ h residence time}} "
+         r"\;=\; 310.25"),
+        ("p",
+         "Biomass then splits into PHA and SCP based on how much of the cell is polymer, and each "
+         "stream picks up its own recovery and drying losses:"),
+        ("latex",
+         r"\text{Sellable PHA} \;=\; \text{Biomass} \;\times\; \text{PHA content} "
+         r"\;\times\; \underbrace{0.88}_{\text{extraction}} \;\times\; \underbrace{0.95}_{\text{dry basis}}"),
+        ("latex",
+         r"\text{Sellable SCP} \;=\; \text{Biomass} \;\times\; (1 - \text{PHA content}) "
+         r"\;\times\; \underbrace{0.85}_{\text{recovery}} \;\times\; \underbrace{0.92}_{\text{dry basis}}"),
+        ("p", "**Where the numbers come from.**"),
+        ("bullets", [
+            "*Vessel volume* — fixed by the Fairfield site: 50,000 L, 150,000 L, or 400,000 L.",
+            "*Utilization* — sidebar slider for each phase, default 90%. This is how full the vessel runs on average.",
+            "*Titer* — sidebar slider, default 60 g/L for both S1 and S2 (Fairfield handoff base case).",
+            "*PHA content* — sidebar slider, default 60% of cell dry weight.",
+            "*0.88 × 0.95 for PHA and 0.85 × 0.92 for SCP* — engineering recovery and dry-basis factors, fixed in the engine.",
+        ]),
+        ("p", "**Worked example — Phase III, Scenario 1, at default slider values.**"),
+        ("latex",
+         r"\text{Annual biomass} \;=\; 400{,}000 \;\times\; 0.90 \;\times\; \tfrac{60}{1000} "
+         r"\;\times\; 310.25 \;=\; 6{,}701{,}400 \text{ kg/yr} \;\approx\; 6{,}701 \text{ t/yr}"),
+        ("latex",
+         r"\text{Sellable PHA} \;=\; 6{,}701{,}400 \;\times\; 0.60 \;\times\; 0.88 \;\times\; 0.95 "
+         r"\;\approx\; 3{,}363 \text{ t/yr}"),
+        ("latex",
+         r"\text{Sellable SCP} \;=\; 6{,}701{,}400 \;\times\; 0.40 \;\times\; 0.85 \;\times\; 0.92 "
+         r"\;\approx\; 2{,}096 \text{ t/yr}"),
+    ],
+    "MSP and Cash Flow": [
+        ("p",
+         "**What the figure shows.** Two panels covering all six phase × scenario points. Left: the "
+         "minimum selling price (MSP) we would need to charge per kg of PHA to exactly cover this "
+         "year's costs, after giving ourselves credit for the SCP we also sell. Right: annual cash "
+         "flow (revenue minus operating costs)."),
+        ("p",
+         "**Left panel — PHA MSP with SCP credit.** In plain words: add up everything we spent this "
+         "year, subtract the dollars we got back from selling SCP, then divide by the kilograms of "
+         "PHA we sold. That is the breakeven PHA price."),
+        ("latex",
+         r"\text{MSP}_{\text{PHA}} \;=\; "
+         r"\frac{\text{Total annual cost} \;-\; (\text{SCP sold} \,\times\, \text{SCP credit price})}"
+         r"{\text{PHA sold}}"),
+        ("p",
+         "If the PHA stream is effectively zero (HGP-alone with the polymer gene knocked out), MSP is "
+         "undefined and the app displays *N/A* rather than a meaningless number."),
+        ("p",
+         "**Right panel — annual cash flow.**"),
+        ("latex",
+         r"\text{Revenue} \;=\; (\text{PHA sold} \,\times\, \text{PHA price}) "
+         r"\;+\; (\text{SCP sold} \,\times\, \text{SCP price})"),
+        ("latex",
+         r"\text{Cash flow} \;=\; \text{Revenue} \;-\; \text{Cash operating cost}"),
+        ("p",
+         "*Cash operating cost* is everything spent on running the plant this year except the "
+         "annualized capital charge. Capital equipment is handled once, up front, in the NPV / IRR "
+         "layer (see the **Returns by Phase** figure) rather than being billed every year."),
+        ("p", "**Where the prices come from.**"),
+        ("bullets", [
+            "*PHA price* — a weighted blend of PHB price and PHBV price set by the PHB-share slider. "
+            "Defaults: 70% × $5.50/kg + 30% × $7.00/kg = $5.95/kg.",
+            "*SCP price* (right panel) — sidebar slider, default $2.00/kg; the revenue we actually book.",
+            "*SCP credit price* (left panel) — separate sidebar slider, default $2.00/kg; how much "
+            "SCP revenue is allowed to offset PHA cost in the MSP quote. Investors often want to "
+            "stress this independently, which is why it has its own slider.",
+            "*Total annual cost* — the ten cost buckets broken out under the **Cost Structure** figure below.",
+        ]),
+    ],
+    "Returns by Phase": [
+        ("p",
+         "**What the figure shows.** A 2 × 2 grid of finance metrics — net present value (NPV), "
+         "internal rate of return (IRR), simple payback, and annual cash flow — across Phase I / "
+         "II / III for S1 and S2."),
+        ("p",
+         "**Upfront investment.** The money spent before the plant starts producing:"),
+        ("latex",
+         r"\text{CapEx} \;=\; \text{Acquisition cost} \;+\; \text{Added major CapEx}"),
+        ("p",
+         "**Net present value.** In plain words: today's value of every future year's cash flow, "
+         "minus the upfront investment. A positive NPV means the project earns more than the "
+         "discount rate; zero means it exactly clears it."),
+        ("latex",
+         r"\text{NPV} \;=\; -\,\text{CapEx} \;+\; \sum_{t=1}^{N} "
+         r"\frac{\text{Cash flow in year } t}{(1 + r)^{t}}"),
+        ("p",
+         "**Internal rate of return.** The discount rate that would make NPV exactly zero. It is the "
+         "rate the project itself earns on the money invested:"),
+        ("latex",
+         r"\text{Find IRR such that:}\quad "
+         r"0 \;=\; -\,\text{CapEx} \;+\; \sum_{t=1}^{N} "
+         r"\frac{\text{Cash flow in year } t}{(1 + \text{IRR})^{t}}"),
+        ("p",
+         "We solve for IRR numerically (Newton–Raphson). If cash flow is negative in every year the "
+         "IRR is undefined and the panel shows *N/A*."),
+        ("p",
+         "**Simple payback.** How many years of cash flow it takes to earn back the upfront investment, "
+         "ignoring the time value of money:"),
+        ("latex",
+         r"\text{Payback (years)} \;=\; "
+         r"\frac{\text{CapEx}}{\text{Annual cash flow}}"),
+        ("p", "**Where the numbers come from.**"),
+        ("bullets", [
+            "*Discount rate* — sidebar slider, default 9% (Fairfield handoff confirmed).",
+            "*Project horizon N* — sidebar slider, default 10 years.",
+            "*Acquisition cost* and *Added major CapEx* — sidebar sliders, both start at $0. Move the "
+            "acquisition slider up to $45M to include the site purchase; move the added-CapEx slider "
+            "to model a DSP retrofit, food-grade retrofit, or other major equipment.",
+            "*Annual cash flow* — same number as the right panel of the **MSP and Cash Flow** figure.",
+        ]),
+    ],
+    "S1 vs S2 Across Phases": [
+        ("p",
+         "**What the figure shows.** Three grouped-bar panels comparing Scenario 1 and Scenario 2 at "
+         "each phase. Left: annual revenue. Middle: annual cash flow. Right: 10-year NPV."),
+        ("p",
+         "**Revenue.** Product tonnes sold times their respective prices. The non-PHA stream is "
+         "either feed-grade SCP (HGP off) or human-grade protein (HGP on):"),
+        ("latex",
+         r"\text{Revenue} \;=\; (\text{PHA sold} \times \text{PHA price}) \;+\; "
+         r"\begin{cases} \text{SCP sold} \times \text{SCP price} & \text{if HGP is off} \\ "
+         r"\text{HGP sold} \times \text{HGP price} & \text{if HGP is on} \end{cases}"),
+        ("p",
+         "**PHA price.** If the PHBV co-production toggle is off, the PHA price is a blend of PHB "
+         "price and PHBV price set by the PHB-share slider. If PHBV is on, the price scales with "
+         "HV content through an auto-price curve:"),
+        ("latex",
+         r"\text{PHBV price} \;=\; \begin{cases} "
+         r"\$5.50/\text{kg} & \text{at } 5\%\ \text{HV} \\ "
+         r"\$7.00/\text{kg} & \text{at } 10\%\ \text{HV} \\ "
+         r"\$9.00/\text{kg} & \text{at } 15\%\ \text{HV} \\ "
+         r"\$12.00/\text{kg} & \text{at } 20\%\ \text{HV} "
+         r"\end{cases}"),
+        ("p",
+         "These anchors come from Tianan Biopolymer, Kaneka PHBH, and Danimer Nodax 2023–2025 "
+         "specialty-bioplastic surveys. Intermediate HV content is interpolated linearly between the "
+         "anchors. A checkbox in the sidebar lets you override with a manual PHBV price."),
+        ("p",
+         "**Cash flow and NPV.** Same formulas as the **Returns by Phase** figure: cash flow is "
+         "revenue minus cash operating costs; NPV discounts that cash flow across the horizon and "
+         "subtracts the upfront CapEx."),
+        ("p",
+         "**Why S1 and S2 produce identical tonnes at the default sliders.** Both scenarios share a "
+         "60 g/L titer and a 60% PHA content by construction, so the left panel (revenue) shows "
+         "matching bars. The scenarios differ only on the cost side — S2 has a larger nitrogen "
+         "reduction and a slightly higher carbon recovery, but pays DLP pretreatment and a small "
+         "galactose-uptake yield penalty — so the middle and right panels can diverge."),
+    ],
+    "NPV vs Selling Price": [
+        ("p",
+         "**What the figure shows.** 10-year NPV as the PHA selling price is swept across a grid "
+         "(default $2–$12/kg, 25 points). One curve per scenario at the phase chosen in the Focus "
+         "View. The point where a curve crosses zero is the breakeven PHA price."),
+        ("p",
+         "**How each point on the curve is built.** For every trial PHA price P:"),
+        ("latex",
+         r"\text{Revenue}(P) \;=\; (\text{PHA sold} \times P) \;+\; (\text{SCP sold} \times \text{SCP price})"),
+        ("latex",
+         r"\text{Cash flow}(P) \;=\; \text{Revenue}(P) \;-\; \text{Cash operating cost}"),
+        ("latex",
+         r"\text{NPV}(P) \;=\; -\,\text{CapEx} \;+\; \sum_{t=1}^{N} "
+         r"\frac{\text{Cash flow}(P)}{(1 + r)^{t}}"),
+        ("p",
+         "All other costs are held constant — only the PHA price changes along the x-axis. Because "
+         "the SCP price is fixed, NPV becomes a linear function of P, which is why every curve in "
+         "the plot is a straight line."),
+        ("p",
+         "**Breakeven PHA price.** The x-axis value where NPV equals zero; the marker on each curve "
+         "makes this visible. Above that price, the project clears the hurdle rate (default 9%); "
+         "below it, it does not."),
+    ],
+    "IRR vs Selling Price": [
+        ("p",
+         "**What the figure shows.** The same PHA-price sweep as the NPV figure, but the y-axis is "
+         "IRR. Horizontal dashed lines mark common investor hurdle rates (8%, 15%, 25%). A curve "
+         "that sits higher at a given PHA price means the project clears a tougher hurdle at a lower "
+         "selling price."),
+        ("p",
+         "**How each point is built.** For every trial PHA price P we compute cash flow exactly as "
+         "in the **NPV vs Selling Price** figure, then solve for the discount rate that makes NPV "
+         "equal zero:"),
+        ("latex",
+         r"\text{Cash flow}(P) \;=\; \text{Revenue}(P) \;-\; \text{Cash operating cost}"),
+        ("latex",
+         r"\text{Find IRR}(P) \text{ such that:}\quad "
+         r"0 \;=\; -\,\text{CapEx} \;+\; \sum_{t=1}^{N} "
+         r"\frac{\text{Cash flow}(P)}{(1 + \text{IRR})^{t}}"),
+        ("p",
+         "The solver is numerical; it starts from an initial guess and refines it until NPV(P) is "
+         "within a small tolerance of zero."),
+        ("p", "**Edge cases.**"),
+        ("bullets", [
+            "*CapEx = 0* — If both CapEx sliders are at $0, the IRR is mathematically undefined "
+            "(any positive cash flow gives infinite IRR). The chart shows a plain-text note instead "
+            "of a line in that case; move the Acquisition or Added Major CapEx slider up to get a "
+            "real IRR curve.",
+            "*Negative cash flow at every trial price* — the solver returns N/A and the curve is "
+            "clipped out of that range.",
+        ]),
+    ],
+    "Cost Structure": [
+        ("p",
+         "**What the figure shows.** A horizontal bar chart of the ten annual cost buckets that add "
+         "up to the plant's total operating cost for the selected phase and scenario. Every bar is "
+         "in $M/yr, and the bars sum to the Total annual cost used elsewhere in the app."),
+        ("p",
+         "**Everything we need to know first.** Before any cost bucket can be calculated we need "
+         "the annual biomass (from the **Phase Output** figure) and the total sugar the fermenter "
+         "has to see in order to make that biomass. That second number depends on how efficiently "
+         "the cells turn sugar into cell mass:"),
+        ("latex",
+         r"\text{Sugar used} \;=\; "
+         r"\frac{\text{Annual biomass}}{\text{Biomass yield} \;\times\; \text{Carbon recovery}}"),
+        ("p",
+         "where biomass yield is kg cell dry weight per kg sugar (default 0.50) and carbon recovery "
+         "is the fraction of carbon that ends up in biomass instead of being respired to CO₂ "
+         "(default 0.90 for S1, 0.92 for S2)."),
+        ("p", "**The ten cost buckets.** Each is a unit rate multiplied by a physical quantity:"),
+        ("latex",
+         r"\text{Feedstock} \;=\; \text{Sugar used} \;\times\; \text{Blended sugar price}"),
+        ("latex",
+         r"\text{Pretreatment} \;=\; \text{Sugar used} \;\times\; \text{Blended pretreatment cost}"),
+        ("latex",
+         r"\text{Nitrogen} \;=\; \text{Annual biomass} \;\times\; "
+         r"\text{Base N cost} \;\times\; (1 \,-\, \text{N reduction})"),
+        ("latex",
+         r"\text{Electricity} \;=\; \text{Annual biomass} \;\times\; "
+         r"\text{Electricity intensity} \;\times\; \text{Electricity price}"),
+        ("latex",
+         r"\text{Steam} \;=\; \text{Annual biomass} \;\times\; \text{Steam cost per kg biomass}"),
+        ("latex",
+         r"\text{PHA extraction} \;=\; \text{PHA sold} \;\times\; \text{Extraction cost per kg PHA}"),
+        ("latex",
+         r"\text{Downstream} \;=\; \text{Annual biomass} \;\times\; \text{DSP cost per kg biomass}"),
+        ("latex",
+         r"\text{CIP / maintenance} \;=\; \text{Annual biomass} \;\times\; \text{CIP cost per kg biomass}"),
+        ("latex",
+         r"\text{Labor} \;=\; \text{Fixed labor budget for the phase}"),
+        ("latex",
+         r"\text{Annualized CapEx} \;=\; \text{CapEx} \;\times\; \text{CRF}(r, N)"),
+        ("p",
+         "where CRF is the capital recovery factor — the yearly constant payment that, discounted "
+         "at rate r for N years, exactly pays off the upfront CapEx:"),
+        ("latex",
+         r"\text{CRF}(r, N) \;=\; \frac{r \,(1+r)^{N}}{(1+r)^{N} - 1}"),
+        ("p",
+         "**Unit-rate defaults (all traced to the Fairfield v7 handoff, Table 11).**"),
+        ("bullets", [
+            "*Jelly Belly sugar price* — $0.110/kg sugar.",
+            "*DLP sugar price* — $0.125/kg sugar (cross-checked against the PhycoVax memo's $0.13/kg Hilmar anchor).",
+            "*Jelly Belly pretreatment* — $0.038/kg sugar (invertase 0.015 + pH 0.004 + filtration 0.007 + HTST 0.012).",
+            "*DLP pretreatment* — $0.004/kg sugar (pH adjust + dilution only).",
+            "*Base N cost* — $0.068/kg biomass (IMARC (NH₄)₂SO₄ 2025, back-calculated).",
+            "*Electricity intensity* — 1.77 kWh/kg biomass; *Electricity price* — $0.12/kWh (AB InBev Fairfield brewery PPA rate).",
+            "*Steam* — $0.160/kg biomass.  *Downstream* — $0.420/kg biomass.  *CIP* — $0.177/kg biomass.",
+            "*PHA extraction* — $0.638/kg sellable PHA.",
+            "*Fixed labor* — $0.45M / $1.10M / $2.00M per year for Phase I / II / III (25% / 60% / 100% headcount ramp).",
+        ]),
+        ("p",
+         "**Worked example — Phase III, Scenario 1, default sliders (60 g/L, 60% PHA, 6,701 t/yr biomass).**"),
+        ("latex",
+         r"\text{Sugar used} \;=\; \tfrac{6{,}701{,}400}{0.50 \times 0.90} \;=\; 14{,}892{,}000 \text{ kg/yr}"),
+        ("bullets", [
+            "Feedstock: 14.89 M kg × $0.110 = **$1.64 M/yr**",
+            "Pretreatment: 14.89 M kg × $0.038 = **$0.57 M/yr**",
+            "Nitrogen: 6.70 M kg × $0.068 × (1 − 0.50) = **$0.23 M/yr**",
+            "Electricity: 6.70 M kg × 1.77 × $0.12 = **$1.42 M/yr**",
+            "Steam: 6.70 M kg × $0.160 = **$1.07 M/yr**",
+            "PHA extraction: 3.36 M kg × $0.638 = **$2.15 M/yr**",
+            "Downstream: 6.70 M kg × $0.420 = **$2.81 M/yr**",
+            "CIP: 6.70 M kg × $0.177 = **$1.19 M/yr**",
+            "Labor: **$2.00 M/yr**",
+            "Annualized CapEx: **$0 M/yr** (both CapEx sliders at default $0)",
+            "**Total ≈ $13.08 M/yr**",
+        ]),
+    ],
+    "Discounted Cash Flow": [
+        ("p",
+         "**What the figure shows.** A running total of the project's discounted cash flow, year by "
+         "year, for the selected phase and scenario. The line starts deep in the red (the upfront "
+         "investment) and climbs as each year's cash flow is added. The year the line crosses zero "
+         "is the *discounted* payback year — the point at which the project has, in today's "
+         "dollars, fully earned back the money put in."),
+        ("p", "**How the line is built.** It starts at minus the upfront investment:"),
+        ("latex",
+         r"\text{Year 0} \;=\; -\,\text{CapEx}"),
+        ("p",
+         "Then each subsequent year adds that year's cash flow, brought into today's dollars by "
+         "dividing by (1 + discount rate) raised to the number of years:"),
+        ("latex",
+         r"\text{Year } t \;=\; \text{Year } (t-1) \;+\; "
+         r"\frac{\text{Annual cash flow}}{(1 + r)^{t}}"),
+        ("p", "**Where the numbers come from.**"),
+        ("bullets", [
+            "*CapEx* — Acquisition cost slider + Added major CapEx slider. Both default to $0, so "
+            "with default sliders the curve just climbs out of zero rather than showing a "
+            "meaningful payback. Move the sliders to see a real crossover year.",
+            "*Annual cash flow* — same cash flow used everywhere else in the app (revenue minus "
+            "cash operating costs), held flat across the horizon.",
+            "*Discount rate r* — sidebar slider, default 9%.",
+            "*Project horizon N* — sidebar slider, default 10 years.",
+        ]),
+        ("p",
+         "**Sanity check.** At year N, the ending value of this curve equals NPV exactly, which is "
+         "how this figure and the **NPV vs Selling Price** figure reconcile."),
+    ],
+    "Feedstock Sensitivity": [
+        ("p",
+         "**What the figure shows.** A targeted three-point sensitivity on feedstock cost only. "
+         "The Jelly Belly HPLC sugar assay is the single largest open data gap, so this figure "
+         "stress-tests the Jelly Belly sugar price and pretreatment cost at ±20% of their default "
+         "values and tracks what MSP does."),
+        ("p",
+         "**How each case is built.** For each multiplier k ∈ {0.8, 1.0, 1.2} and each scenario:"),
+        ("latex",
+         r"\text{Adjusted Jelly Belly sugar price} \;=\; k \;\times\; \$0.110/\text{kg}"),
+        ("latex",
+         r"\text{Adjusted Jelly Belly pretreatment} \;=\; k \;\times\; \$0.038/\text{kg}"),
+        ("p",
+         "We then rebuild the feedstock and pretreatment cost buckets with those adjusted prices, "
+         "leave every other cost bucket untouched, and recompute MSP using the same formula as the "
+         "**MSP and Cash Flow** figure:"),
+        ("latex",
+         r"\text{MSP}_{\text{PHA}}(k) \;=\; "
+         r"\frac{\text{Total annual cost}(k) \;-\; \text{SCP credit}}{\text{PHA sold}}"),
+        ("p",
+         "Only the Jelly Belly side is perturbed; the DLP sugar price and DLP pretreatment are held "
+         "fixed. That is why Scenario 2 (which is 70% Jelly Belly + 30% DLP) shows a smaller swing "
+         "than Scenario 1 (which is 100% Jelly Belly): the DLP portion insulates S2 from the sweep."),
+        ("p",
+         "**How to read the bars.** The middle bar is the baseline. The −20% and +20% bars bracket "
+         "the plausible MSP band if the Jelly Belly sugar assay comes in at the low or high end of "
+         "the composition range when we actually see the HPLC data."),
+    ],
+    "OAT Sensitivity": [
+        ("p",
+         "**What the figure shows.** A one-at-a-time (OAT) tornado chart. For the selected phase "
+         "and scenario, every significant input is tested at ±20% of its default value and the "
+         "resulting spread in MSP is drawn as a horizontal bar. The input with the biggest bar "
+         "(most leverage on unit economics) sits on top; the smallest-leverage input sits on the "
+         "bottom."),
+        ("p", "**How each bar is built.** For every input x in the list below:"),
+        ("bullets", [
+            "Set x to 80% of its default, recompute the whole model, record the resulting MSP.",
+            "Set x to 120% of its default, recompute, record the resulting MSP.",
+            "Draw a horizontal bar spanning those two MSP values, centered on the baseline MSP.",
+        ]),
+        ("p", "The underlying MSP formula is the same one used in the **MSP and Cash Flow** figure:"),
+        ("latex",
+         r"\text{MSP}_{\text{PHA}} \;=\; "
+         r"\frac{\text{Total annual cost} \;-\; \text{SCP credit}}{\text{PHA sold}}"),
+        ("p", "**Inputs perturbed.**"),
+        ("bullets", [
+            "Biomass yield (kg biomass per kg sugar)",
+            "Titer (g/L)",
+            "PHA content (fraction of biomass)",
+            "Carbon recovery (fraction of sugar carbon retained in biomass)",
+            "Electricity price",
+            "Blended feedstock sugar price (Jelly Belly + DLP, weighted by scenario mix)",
+            "Blended pretreatment cost",
+            "Nitrogen reduction (fraction of base N that is avoided)",
+            "Fixed labor",
+            "Acquisition cost (upfront CapEx)",
+            "Discount rate",
+        ]),
+        ("p",
+         "**How to read it.** A long bar means investors should stress that input hardest when "
+         "doing due diligence — getting it wrong by 20% moves the breakeven PHA price by the "
+         "amount shown. A short bar means the project is robust to that assumption."),
+    ],
+    "Phase III Headline (v10, three modes)": [
+        ("p",
+         "**What the figure shows.** Three panels (annual revenue, annual cash flow, 10-year NPV) "
+         "for Phase III only. Each panel has six bars: three HGP modes (off, co-production, HGP "
+         "alone) for each of the two scenarios."),
+        ("p", "**Mode 1 — HGP off.** The plant behaves like the v9 baseline. The non-PHA stream is "
+              "sold as feed-grade SCP:"),
+        ("latex",
+         r"\text{Non-PHA revenue} \;=\; \text{SCP sold} \;\times\; \text{SCP price}"),
+        ("p",
+         "**Mode 2 — HGP co-production.** The PHA stream is unchanged. The non-PHA stream is "
+         "re-priced and re-costed as a human-grade whole-cell protein mash. The recovery is "
+         "slightly different from feed-grade SCP (whole-cell mash, not pelletized), and it picks up "
+         "an incremental downstream-processing cost for endotoxin removal and food-grade spray drying:"),
+        ("latex",
+         r"\text{HGP sold} \;=\; \text{Biomass} \;\times\; (1 - \text{PHA content}) "
+         r"\;\times\; \text{HGP recovery}"),
+        ("latex",
+         r"\text{Non-PHA revenue} \;=\; \text{HGP sold} \;\times\; \text{HGP price}"),
+        ("latex",
+         r"\text{Extra DSP cost} \;=\; \text{HGP sold} \;\times\; \text{HGP DSP cost}"),
+        ("p",
+         "**Mode 3 — HGP alone.** The fermenter runs nitrogen-replete so PHA never accumulates, and "
+         "the PHA synthase gene (phaC) is knocked out as a belt-and-suspenders. PHA content is "
+         "forced to 0%, the PHA stream disappears, and essentially the whole cell is sold as HGP:"),
+        ("latex",
+         r"\text{PHA content} \;=\; 0 \quad \Rightarrow \quad \text{PHA sold} \;=\; 0"),
+        ("latex",
+         r"\text{HGP sold} \;=\; \text{Biomass} \;\times\; \text{HGP recovery}"),
+        ("p", "**Where the HGP numbers come from.**"),
+        ("bullets", [
+            "*HGP recovery* — 0.85 (whole-cell mash, Quorn / Solein style), sidebar-adjustable.",
+            "*HGP price* — sidebar slider, default $8/kg (mid-point of the Quorn mycoprotein "
+            "$6–10/kg ingredient band).",
+            "*HGP DSP cost* — sidebar slider, default $1.80/kg HGP (TFF endotoxin reduction + "
+            "food-grade spray drying + polymyxin-B polish and release QA).",
+        ]),
+        ("p", "**Worked example — Phase III, Scenario 1, co-production, defaults.**"),
+        ("latex",
+         r"\text{HGP sold} \;=\; 6{,}701{,}400 \;\times\; 0.40 \;\times\; 0.85 \;\approx\; 2{,}278 \text{ t/yr}"),
+        ("latex",
+         r"\text{Non-PHA revenue} \;=\; 2{,}278{,}476 \;\times\; \$8 \;\approx\; \$18.23\,\text{M/yr}"),
+        ("latex",
+         r"\text{Extra DSP cost} \;=\; 2{,}278{,}476 \;\times\; \$1.80 \;\approx\; \$4.10\,\text{M/yr}"),
+        ("p",
+         "For reference, the same stream sold as feed-grade SCP at $2/kg would be $4.19M/yr — so "
+         "HGP co-production adds roughly $14M/yr of top-line at Phase III, before the extra DSP cost."),
+        ("p", "**HGP-alone example (Phase III, S1, PHA content = 0).**"),
+        ("latex",
+         r"\text{HGP sold} \;=\; 6{,}701{,}400 \;\times\; 0.85 \;\approx\; 5{,}696 \text{ t/yr}"),
+        ("latex",
+         r"\text{Non-PHA revenue} \;=\; 5{,}696{,}190 \;\times\; \$8 \;\approx\; \$45.57\,\text{M/yr}"),
+    ],
+    "Product Slate by Mode (Phase III)": [
+        ("p",
+         "**What the figure shows.** A stacked mass-flow bar chart for Phase III, Scenario 1. One "
+         "bar per HGP mode (off / co-production / HGP alone). Each bar segment is annual sellable "
+         "PHA (blue), feed-grade SCP (orange), or HGP whole-cell mash (green), in tonnes per year. "
+         "The number above each bar is the total sellable mass for that mode."),
+        ("p", "**HGP off — the v9 baseline.**"),
+        ("latex",
+         r"\text{PHA sold} \;=\; \text{Biomass} \;\times\; \text{PHA content} \;\times\; 0.88 \;\times\; 0.95"),
+        ("latex",
+         r"\text{SCP sold} \;=\; \text{Biomass} \;\times\; (1 - \text{PHA content}) \;\times\; 0.85 \;\times\; 0.92"),
+        ("latex", r"\text{HGP sold} \;=\; 0"),
+        ("p", "**HGP co-production.** PHA stream unchanged; the non-PHA stream is repackaged as HGP:"),
+        ("latex",
+         r"\text{PHA sold} \;=\; \text{Biomass} \;\times\; \text{PHA content} \;\times\; 0.88 \;\times\; 0.95"),
+        ("latex", r"\text{SCP sold} \;=\; 0"),
+        ("latex",
+         r"\text{HGP sold} \;=\; \text{Biomass} \;\times\; (1 - \text{PHA content}) "
+         r"\;\times\; \text{HGP recovery}"),
+        ("p", "**HGP alone.** PHA synthase knocked out; essentially everything becomes HGP:"),
+        ("latex",
+         r"\text{PHA content} \;=\; 0 \quad \Rightarrow \quad "
+         r"\text{PHA sold} \;=\; 0,\;\; \text{SCP sold} \;=\; 0"),
+        ("latex",
+         r"\text{HGP sold} \;=\; \text{Biomass} \;\times\; \text{HGP recovery}"),
+        ("p",
+         "Because recoveries are different across streams (0.88 × 0.95 for PHA, 0.85 × 0.92 for SCP, "
+         "0.85 for HGP), the total mass above each bar is **not** equal to the raw annual biomass. "
+         "It is the mass that actually leaves the downstream train in saleable form."),
+    ],
+    "HGP Price Sensitivity": [
+        ("p",
+         "**What the figure shows.** 10-year NPV at Phase III as the HGP selling price is swept "
+         "from $3 to $12/kg. Four curves are drawn: co-production S1, co-production S2, HGP-alone "
+         "S1, HGP-alone S2. A vertical dashed line marks the current HGP-price slider value, and "
+         "the shaded bands show commercial price envelopes for real food-ingredient products."),
+        ("p",
+         "**How each point is built (co-production).** The PHA stream is held constant. Only the "
+         "HGP price changes; the HGP tonnage, the HGP DSP cost, and every other cost bucket are "
+         "held fixed, so NPV is a linear function of the HGP price. That is why each curve is a "
+         "straight line."),
+        ("latex",
+         r"\text{Revenue}(\text{HGP price}) \;=\; "
+         r"(\text{PHA sold} \times \text{PHA price}) \;+\; (\text{HGP sold} \times \text{HGP price})"),
+        ("latex",
+         r"\text{Cash flow}(\text{HGP price}) \;=\; \text{Revenue}(\text{HGP price}) \;-\; "
+         r"\text{Cash operating cost}"),
+        ("latex",
+         r"\text{NPV}(\text{HGP price}) \;=\; -\,\text{CapEx} \;+\; \sum_{t=1}^{N} "
+         r"\frac{\text{Cash flow}(\text{HGP price})}{(1 + r)^{t}}"),
+        ("p",
+         "**HGP-alone arm.** Same formulas, but the PHA synthase is knocked out so the PHA stream "
+         "disappears. Revenue collapses to a single term:"),
+        ("latex",
+         r"\text{Revenue}(\text{HGP price}) \;=\; \text{HGP sold} \;\times\; \text{HGP price}"),
+        ("p",
+         "HGP-alone curves sit higher than co-production curves at every HGP price, because roughly "
+         "100% of the cell mass flows through the HGP stream instead of only the non-PHA 40%."),
+        ("p", "**What the shaded bands represent (left to right on the x-axis).**"),
+        ("bullets", [
+            "*$3–$6/kg* — Solar Foods' Solein dry-protein production-cost floor at Factory 01 scale.",
+            "*$6–$10/kg* — Quorn mycoprotein ingredient-grade pricing and Solein mid-band ingredient pricing.",
+            "*$10–$12/kg* — branded specialty and premium food-ingredient off-take.",
+        ]),
+    ],
+    "P&L Waterfall": [
+        ("p",
+         "**What the figure shows.** A profit-and-loss waterfall for the selected phase and "
+         "scenario. The green bar on the left is annual revenue; each red bar subtracts one "
+         "operating cost bucket; the blue bar on the right is what is left — annual cash flow. "
+         "The revenue label changes automatically depending on which streams are on: *PHA + SCP*, "
+         "*PHA + HGP*, or *HGP alone*."),
+        ("p", "**The walk, in one equation:**"),
+        ("latex",
+         r"\begin{aligned}"
+         r"\text{Cash flow} \;=\; & \text{Revenue} \\"
+         r"& -\,\text{Feedstock} \;-\; \text{Pretreatment} \;-\; \text{Nitrogen} \\"
+         r"& -\,\text{Electricity} \;-\; \text{Steam} \\"
+         r"& -\,\text{PHA extraction} \;-\; \text{Downstream} \;-\; \text{HGP DSP} \\"
+         r"& -\,\text{CIP} \;-\; \text{Labor}"
+         r"\end{aligned}"),
+        ("p",
+         "Every red bar is one of the ten cost buckets defined under the **Cost Structure** figure, "
+         "divided by one million so the y-axis reads in $M/yr. The HGP-DSP bar only appears when "
+         "HGP is enabled; otherwise it is zero and is dropped from the chart."),
+        ("p",
+         "**Why annualized CapEx is not here.** Capital spending is not an operating cost — it is a "
+         "one-time investment that the NPV / IRR layer handles separately. Subtracting an "
+         "annualized CapEx charge here would double-count it in the finance figures, so the "
+         "waterfall stops at operating cash flow."),
+        ("p",
+         "**Sanity check at Phase III, S1, default sliders.** Revenue is about $24.2M, the red "
+         "bars sum to about $13.0M, and the blue bar is about $11.2M — exactly the cash-flow "
+         "number on the right panel of the **MSP and Cash Flow** figure."),
+    ],
+    "DSP Cost Stack": [
+        ("p",
+         "**What the figure shows.** Two stacked bars comparing the downstream-processing cost "
+         "per kilogram of non-PHA sellable product. The left bar is the feed-grade SCP train; the "
+         "right bar is the HGP whole-cell mash train (the food-grade alternative). Both are in "
+         "$/kg of product sold."),
+        ("p",
+         "**Left bar — feed-grade SCP, fixed engineering split.** This is an engineering "
+         "break-down of the all-in $0.60/kg SCP figure that rolls up into the plant-wide downstream "
+         "cost line: centrifuge dewatering + spray drying + pelletizing + CIP. It is shown here "
+         "so investors can see what they are getting; the cost itself is already captured by the "
+         "downstream line under the **Cost Structure** figure."),
+        ("p",
+         "**Right bar — HGP whole-cell mash, scaled to the slider.** The HGP DSP cost is split "
+         "into three engineering segments whose proportions come from the bottom-up justification "
+         "of the $1.80/kg default:"),
+        ("latex",
+         r"\text{TFF endotoxin reduction} \;=\; \text{HGP DSP slider} \;\times\; "
+         r"\tfrac{1.05}{1.80} \;\approx\; 58\%"),
+        ("latex",
+         r"\text{Food-grade spray drying} \;=\; \text{HGP DSP slider} \;\times\; "
+         r"\tfrac{0.50}{1.80} \;\approx\; 28\%"),
+        ("latex",
+         r"\text{Polymyxin-B polish + release QA} \;=\; \text{HGP DSP slider} \;\times\; "
+         r"\tfrac{0.25}{1.80} \;\approx\; 14\%"),
+        ("p",
+         "The three segments always sum back to whatever value the HGP DSP slider currently holds, "
+         "and the engine multiplies that total by the kilograms of HGP sold to get the total "
+         "HGP-DSP cost line in the waterfall:"),
+        ("latex",
+         r"\text{Total HGP DSP cost} \;=\; \text{HGP sold} \;\times\; \text{HGP DSP slider}"),
+        ("p",
+         "**Interpretation.** HGP DSP costs roughly 3× as much per kilogram as feed-grade SCP DSP "
+         "(about $1.80/kg vs about $0.60/kg), but it is applied to a more valuable product — HGP "
+         "sells at an $8/kg default vs $2/kg for feed-grade SCP — which is why the HGP arms of the "
+         "**Phase III Headline** figure show substantially higher cash flow even after the extra "
+         "DSP burden."),
+    ],
 }
 
 
@@ -5419,20 +5646,22 @@ fig_opts = {
     ),
 }
 sel_fig = st.selectbox("Select Fairfield figure", list(fig_opts.keys()), key="v5_sel_fig")
-formula_text = V5_FIGURE_FORMULAS.get(sel_fig)
-if formula_text:
+formula_segments = V5_FIGURE_FORMULAS.get(sel_fig)
+if formula_segments:
     with st.expander("How is this figure calculated?"):
-        # Only escape `$` in prose segments; inside fenced code blocks we
-        # want literal `$` (e.g. "$/kg CDW") to render as-is without the
-        # markdown engine interpreting it as a LaTeX math delimiter.
-        _parts = formula_text.split("```")
-        _rendered = []
-        for _i, _seg in enumerate(_parts):
-            if _i % 2 == 0:
-                _rendered.append(_seg.replace("$", r"\$"))
-            else:
-                _rendered.append("```" + _seg + "```")
-        st.markdown("".join(_rendered))
+        # Render each typed segment with the appropriate Streamlit primitive.
+        # Prose and bullet segments escape `$` to `\$` so currency reads as
+        # currency rather than being interpreted as a LaTeX math delimiter.
+        # LaTeX segments are passed straight to st.latex unchanged.
+        for _kind, _content in formula_segments:
+            if _kind == "p":
+                st.markdown(_content.replace("$", r"\$"))
+            elif _kind == "latex":
+                st.latex(_content)
+            elif _kind == "bullets":
+                st.markdown("\n".join(
+                    "- " + _item.replace("$", r"\$") for _item in _content
+                ))
 st.markdown('<div class="fig-frame">', unsafe_allow_html=True)
 fig = fig_opts[sel_fig]()
 st.pyplot(fig, use_container_width=True)
