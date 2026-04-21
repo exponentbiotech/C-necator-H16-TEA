@@ -835,12 +835,12 @@ REFERENCE_LIBRARY: Dict[str, Dict[str, str]] = {
         "url_note": "Internal / confidential document.",
     },
     "wang_2022": {
-        "title": "Wang et al. 2022, Processes 10:17",
+        "title": "Wang K, Hobby AM, Chen Y, Chio A, Jenkins BM, Zhang R. 2022, Processes 10(1):17 -- Techno-economic analysis on an industrial-scale production system of polyhydroxyalkanoates (PHA) from cheese by-products by halophiles",
         "kind": "Literature / TEA",
-        "why": "DLP pricing and lactase-reuse / pretreatment economics.",
-        "used": "Used qualitatively for DLP pretreatment and feed-cost framing. No single hard-coded numeric default is copied directly from this citation.",
-        "url": "https://scholar.google.com/scholar?q=Wang+2022+Processes+delactosed+whey+permeate+enzyme",
-        "url_note": "MDPI Processes article not located via DOI search. Replace with your team's known DOI.",
+        "why": "Peer-reviewed industrial-scale TEA from UC Davis (Wang et al.) co-authored with Hilmar Cheese Company engineering staff. Analyzes PHA (PHBV) production from cheese by-product streams using Haloferax mediterranei at 168.7 MT/day lactose feed, producing 9,700 MT/year PHBV with 0.2 g PHBV/g lactose yield and 87% overall process efficiency. Reports DLP unit price as the dominant breakeven-price driver (breakeven <$4/kg PHA at favorable DLP terms with enzyme reuse and spent-medium recycling).",
+        "used": "Used qualitatively as the external literature anchor for the order-of-magnitude DLP sugar-cost (~$0.125/kg sugar) and DLP pretreatment-cost (~$0.004/kg sugar) bands in the v10 engine. The DLP supplier in the Wang 2022 paper (Hilmar Cheese Company, Hilmar CA) is the same supplier named in the Leatherback Fairfield site handoff Scenario 2 definition, which is why this paper was selected as the external reference. No single hard-coded scalar is copied directly; the engine's DLP defaults sit inside the pricing envelope established by the paper.",
+        "url": "https://doi.org/10.3390/pr10010017",
+        "url_note": "Direct MDPI DOI. The earlier entry pointed to a Google Scholar search because the specific paper had not been located; this is now the published article.",
     },
     "pubmed_40669633": {
         "title": "PubMed 40669633 (2025) -- whey permeate / DSM545",
