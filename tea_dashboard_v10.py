@@ -4921,17 +4921,35 @@ st.caption(
     "Base case: 60 g/L CDW, 60% PHB (sidebar-adjustable)"
 )
 
-_sb_hdr("Focus View")
-st.sidebar.caption(
-    "This does not change the full model run. It only chooses which phase/scenario the summary cards and single-case figures focus on."
+# Detail-view pickers. The overall model always runs every phase and both
+# scenarios; these two selectors only choose which phase and scenario are
+# plotted in the single-case figures (Cost Structure, Waterfall, NPV vs
+# Price, Discounted Cash Flow, etc.) and in the summary metric cards.
+# Placed at the top of the main panel so their connection to the detail
+# charts below is visually obvious.
+st.markdown("##### Detail view — which phase and scenario to show in the charts below")
+st.caption(
+    "The model always runs all three phases and both scenarios in parallel — these "
+    "two pickers only change which one is plotted in the single-case figures and "
+    "summary metric cards below. They have no effect on the multi-case figures "
+    "(Phase Output, Returns by Phase, S1 vs S2 Across Phases) or on the "
+    "Phase + Scenario Table further down."
 )
-focus_phase = st.sidebar.selectbox("Detailed chart phase", list(PHASE_VOLUMES_L.keys()), index=2, key="v5_focus_phase")
-focus_scenario = st.sidebar.selectbox(
-    "Detailed chart scenario",
-    [f"{k} — {v.title}" for k, v in FAIRFIELD_SCENARIOS.items()],
-    index=0,
-    key="v5_focus_scenario",
-)
+_det_col_phase, _det_col_scenario = st.columns(2)
+with _det_col_phase:
+    focus_phase = st.selectbox(
+        "Phase to show",
+        list(PHASE_VOLUMES_L.keys()),
+        index=2,
+        key="v5_focus_phase",
+    )
+with _det_col_scenario:
+    focus_scenario = st.selectbox(
+        "Scenario to show",
+        [f"{k} — {v.title}" for k, v in FAIRFIELD_SCENARIOS.items()],
+        index=0,
+        key="v5_focus_scenario",
+    )
 focus_scenario_id = focus_scenario.split(" — ", 1)[0]
 
 _sb_hdr("Fairfield Controls")
@@ -5547,8 +5565,8 @@ with st.expander("Fairfield Facility + Scenario Basis", expanded=True):
 
 _section("Selected Operating Point")
 st.caption(
-    f"Detailed view is currently centered on `{focus_phase}` / `{focus_scenario_id}`. "
-    "All phases and both modeled scenarios are still calculated in the table and multi-case figures below."
+    f"Showing `{focus_phase}` / `{focus_scenario_id}` (change this at the top of the page). "
+    "All phases and both scenarios are still calculated in the Phase + Scenario Table and the multi-case figures below."
 )
 st.caption(
     f"Throughput basis (continuous): {focus.vessel_volume_L:,.0f} L installed × "
