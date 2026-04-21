@@ -181,15 +181,19 @@ Revision history:
           * Crude-protein content: 63 % default (range 45-75 %),
             consistent with Quorn ingredient-grade mash and bacterial
             SCP literature.
-          * Regulatory caveat surfaced in the sidebar: no
-            C. necator-derived SCP has a GRAS or novel-food
-            authorisation for human food in any major market. Other
-            single-cell proteins (e.g. Solein, Xanthobacter sp.) have
-            cleared Singapore novel-food (2022) and US self-affirmed
-            GRAS (2024), but these are organism- and product-specific
-            and do not extend to a new C. necator HGP. US GRAS / EFSA
-            novel-food dossiers typically run 2-3 years. HGP economics
-            should be treated as pro-forma pending clearance.
+          * Regulatory caveat surfaced in the sidebar: C. necator H16
+            has a mixed regulatory footprint (EFSA QPS "production
+            purposes only"; PHA polymer holds FDA Food Contact
+            Notifications such as Kaneka FCN 1835) but the biomass
+            itself is not GRAS and is not EFSA-Novel-Food-authorised
+            as a food ingredient in any major market. Solar Foods
+            Solein (a Xanthobacter-group organism, NOT C. necator)
+            holds Singapore novel-food approval (2022) and US
+            self-affirmed GRAS (2024), with EFSA Novel Food review
+            in progress; these clearances do not extend to a new
+            C. necator HGP. US GRAS / EFSA Novel Food dossiers
+            typically run 2-3 years. HGP economics are pro-forma
+            pending that clearance.
           * Facility CapEx for the HGP retrofit (endotoxin skid,
             sanitary spray drier, GFSI compliance) is NOT auto-added
             to the CapEx stack. Users who want to stress-test the
@@ -2630,9 +2634,18 @@ def phbv_auto_price(hv_mol_pct: float) -> float:
 #       basal PHB under growth-phase metabolism) if the KO strain is
 #       not yet available, or to represent an incomplete-KO phenotype.
 #
-# Regulatory caveat: no bacterial SCP is currently GRAS-approved for human
-# food in the United States. EFSA novel-food path exists but typically takes
-# 2-3 years of dossier and review. HGP economics are pro-forma pending clearance.
+# Regulatory caveat: C. necator H16 has a mixed regulatory footprint, not a
+# blanket clearance. The organism sits on the EFSA QPS list (production purposes
+# only) and its PHA polymer has FDA Food Contact Notifications (e.g. Kaneka
+# FCN 1835 on P(3HB-co-3HHx)), but the biomass itself does not hold a US GRAS
+# notice or an EFSA Novel Food authorisation as a food ingredient. The closest
+# commercial precedent (Solar Foods Solein, produced from a Xanthobacter-group
+# organism rather than C. necator) holds Singapore novel-food approval (2022)
+# and US self-affirmed GRAS (2024); its EFSA Novel Food dossier is in progress.
+# A C. necator-biomass HGP product would require its own US GRAS (or
+# self-affirmed GRAS) or EFSA Novel Food clearance, each typically 2-3 years of
+# review once the toxicology, allergenicity, and compositional packages are in
+# hand. HGP economics are pro-forma pending that clearance.
 
 HGP_ENABLED_DEFAULT = False
 HGP_PRODUCTION_MODE_DEFAULT = "coproduction"  # "coproduction" or "alone"
@@ -4501,12 +4514,16 @@ _sb_hdr("Human-grade SCP (v10)")
 st.sidebar.caption(
     "HGP mode re-prices and re-costs the non-PHA fraction of CDW as human-grade "
     "whole-cell protein mash instead of feed-grade SCP. When OFF, the model "
-    "behaves exactly like v9. Regulatory caveat: no _C. necator_-derived SCP "
-    "has a GRAS or novel-food authorisation for human food in any major market; "
-    "recent microbial-protein clearances (e.g. Solein, Singapore 2022 and US "
-    "self-affirmed GRAS 2024) are organism- and product-specific and do not "
-    "extend to a new _C. necator_ HGP. US GRAS / EFSA novel-food dossiers "
-    "typically run 2-3 years. Treat HGP economics as pro-forma pending clearance."
+    "behaves exactly like v9. Regulatory caveat: _C. necator_ H16 has a mixed "
+    "regulatory footprint (EFSA QPS \"production purposes only\"; PHA polymer "
+    "holds FDA FCNs including Kaneka FCN 1835) but the biomass itself does not "
+    "hold a US GRAS notice or an EFSA Novel Food authorisation as a food "
+    "ingredient. Solar Foods' Solein (a _Xanthobacter_-group organism, not "
+    "_C. necator_) holds Singapore novel-food approval (2022) and US "
+    "self-affirmed GRAS (2024); these clearances do not extend to a new "
+    "_C. necator_ HGP. US GRAS / EFSA Novel Food dossiers run 2-3 years once "
+    "toxicology, allergenicity, and compositional packages are in hand. Treat "
+    "HGP economics as pro-forma pending that clearance."
 )
 hgp_enabled = st.sidebar.checkbox(
     "Enable human-grade SCP (HGP)",
@@ -4781,23 +4798,35 @@ if hgp_enabled:
         )
     )
     st.info(
-        "**Note — human-grade SCP (HGP) mode is ON (v10).** "
+        "**Note: human-grade SCP (HGP) mode is ON (v10).** "
         f"{_hgp_mode_text} "
         f"HGP is priced at \\${hgp_selling_price:.2f}/kg with an incremental DSP cost of "
         f"\\${hgp_dsp_cost_per_kg:.2f}/kg HGP (endotoxin removal + food-grade spray drying + QA). "
-        "**Regulatory status:** no _C. necator_-derived SCP has a GRAS or "
-        "novel-food authorisation for human food in any major market. A small "
-        "number of other single-cell proteins have recently cleared: Solein "
-        "(Xanthobacter sp., Solar Foods) holds Singapore novel-food approval "
-        "(2022) and US self-affirmed GRAS (2024), with EFSA novel-food review "
-        "in progress; these clearances are for specific organisms and specific "
-        "product specifications and do NOT extend to a new _C. necator_ HGP "
-        "product. US GRAS and EFSA novel-food dossiers typically run 2-3 years. "
-        "Treat HGP headline economics as **pro-forma pending regulatory "
-        "clearance**. "
-        "Food-grade facility retrofit CapEx (endotoxin skid, sanitary spray drier, GFSI "
-        "compliance — literature band \\$8-15M at Phase III) is **not** auto-added; bump "
-        "the **Added major CapEx** slider to stress-test it."
+        "**Regulatory status:** _C. necator_ H16 has a mixed regulatory "
+        "footprint rather than a blanket clearance. The organism sits on the "
+        "EFSA Qualified Presumption of Safety (QPS) list with the "
+        "qualification \"production purposes only\" (it is accepted as a "
+        "production host where viable cells do not reach the finished "
+        "product), and PHA polymer produced from _C. necator_ H16 holds "
+        "multiple FDA Food Contact Notifications (e.g. Kaneka FCN 1835 on "
+        "P(3HB-co-3HHx)). Neither the QPS listing nor the FCNs cover use of "
+        "the biomass as a food ingredient. The biomass itself does not hold "
+        "an FDA GRAS notice or an EFSA Novel Food authorisation in any "
+        "major market as of the model date. The closest commercial "
+        "precedent, Solar Foods' Solein, is produced from a "
+        "_Xanthobacter_-group organism (not _C. necator_) and holds "
+        "Singapore novel-food approval (2022) and US self-affirmed GRAS "
+        "(2024); its EFSA Novel Food dossier is in progress. A "
+        "C. necator-biomass HGP product would require its own GRAS "
+        "notification (or self-affirmed GRAS) in the US, or an EFSA Novel "
+        "Food authorisation in the EU, each a 2-3 year process once the "
+        "toxicology, allergenicity, and compositional dossiers are in "
+        "hand. **Treat HGP headline economics as pro-forma pending that "
+        "clearance.** "
+        "Food-grade facility retrofit CapEx (endotoxin skid, sanitary "
+        "spray drier, GFSI compliance; internal estimate \\$8-15M at "
+        "Phase III) is **not** auto-added; bump the **Added major CapEx** "
+        "slider to stress-test it."
     )
 
 # Default-settings note: call out the v9 vs v8/v7 difference in the DSP flowsheet
