@@ -7,11 +7,8 @@ Dedicated Fairfield model built from the April 2026 site handoff and PDF.
 Scope:
   - Facility: former AB InBev brewery, 3101 Busch Dr, Fairfield CA
   - Fixed phase sizes: 50,000 L / 150,000 L / 400,000 L
-  - Dual operating mode: continuous (24 h HRT, 85 % uptime) OR fed-batch
-    (cycle time + duty cycle, high-density N-limited). Global mode toggle
-    drives both S1 and S2 simultaneously.
-  - Fed-batch base case: 150 g/L CDW, 68 % PHB, 76 h cycle, 68 % duty cycle
-    (Kim 1994, Ryu 1997, Budde 2011 literature anchors).
+  - Continuous fermentation only in the Streamlit UI: 24 h HRT, 85 % uptime,
+    per-scenario CDW titer and PHB sliders (v7/v9 base 60 g/L, 60 % PHB).
   - DSP pathway selector (v9): NaOCl hypochlorite (Biopol-era baseline),
     NaOH hot alkali, Mechanical + enzymatic (modern CMO standard).
     Default = Mechanical + enzymatic. Each pathway has its own extraction
@@ -22,8 +19,8 @@ Scope:
     (Tianan / Kaneka / Danimer benchmarks) with manual override.
   - Scenarios modeled: S1 (Jelly Belly COD) and S2 (70/30 JB COD + DLP)
   - Finance: 9 % discount rate, 10-year horizon
-  - CapEx sliders: acquisition cost + added major CapEx + (fed-batch only)
-    OTR-retrofit CapEx + (v9) DSP-pathway CapEx adder
+  - CapEx sliders: acquisition cost + added major CapEx + (v9) DSP-pathway
+    CapEx adder where applicable
 
 Revision history:
   v5 — Original Fairfield biorefinery model (feed-grade SCP + PHA).
@@ -70,19 +67,10 @@ Revision history:
        because the TEA computes annual CDW from first principles; it is
        flagged here for correction at the handoff source.
 
-  v8 — Adds a fed-batch operating mode as a first-class alternative to the
-       continuous mode retained from v7. A single global toggle in the
-       sidebar switches both S1 and S2 between modes. Continuous mode
-       behaves identically to v7 (60 g/L CDW, 24 h HRT, 85 % uptime).
-       Fed-batch mode exposes CDW titer (60-250 g/L, default 150 g/L),
-       PHB content (default 68 %), cycle time (36-120 h, default 76 h),
-       duty cycle (40-85 %, default 68 %), and an OTR-retrofit CapEx
-       adder (0-15 M$, default 0) covering impeller, sparger, and motor
-       upgrades needed to reach high cell density in the Fairfield
-       brewery vessels. Fed-batch defaults are anchored to Kim 1994,
-       Ryu 1997, and Budde 2011. SCP revenue math is unchanged in v8
-       fed-batch mode; reduced crude-protein content of N-limited
-       residual biomass is flagged as a caveat only.
+  v8 — Historically added a fed-batch operating-mode alternative in the
+       sidebar. The fed-batch UI was later removed; the dashboard now
+       exposes continuous fermentation only. The compute layer still
+       accepts operating_mode overrides for scripted analyses.
 
   v9 — Two extensions to v8:
 
@@ -2499,7 +2487,7 @@ DSP_PATHWAYS: Dict[str, Dict[str, Any]] = {
         "downstream_per_kg_cdw": 0.300,
         "phase3_capex": 0.0,
         "mw_note": "Mw-preserving. Delivered molecular weight is 80-95% of the fermented polymer; suitable for injection molding, fiber, and melt-processable grades.",
-        "pathway_note": "High-pressure homogenization (~800-1200 bar) to break cell walls, then protease + lipase polishing to remove non-PHA cell matter. Requires high-density biomass (>=100 g/L) to justify the reagent load, so pairs naturally with v8 fed-batch mode. Incremental equipment (HPH skid + polishing reactor) is not auto-added to the model; if modeling retrofit cost, bump the 'Added major CapEx' slider.",
+        "pathway_note": "High-pressure homogenization (~800-1200 bar) to break cell walls, then protease + lipase polishing to remove non-PHA cell matter. Requires high-density biomass (>=100 g/L) to justify the reagent load; raise the S1/S2 CDW titer sliders into that band for a fair comparison to literature homogenization TEAs. Incremental equipment (HPH skid + polishing reactor) is not auto-added to the model; if modeling retrofit cost, bump the 'Added major CapEx' slider.",
     },
 }
 
@@ -3190,18 +3178,11 @@ def _fairfield_guardrail_warnings(
     for phase, util in phase_utils.items():
         _check(f"{phase} utilization (%)", util, 20.0, 95.0, "Very low utilization is a ramp case; 100% continuous use is usually too optimistic.")
 
-    if operating_mode == "fed_batch":
-        titer_lo, titer_hi = 80.0, 250.0
-        phb_lo, phb_hi = 40.0, 80.0
-        titer_note_s1 = "Fed-batch mode: literature band 100-280 g/L (Kim 1994, Ryu 1997, Budde 2011)."
-        titer_note_s2 = titer_note_s1
-        titer_stretch_threshold = 200.0
-    else:
-        titer_lo, titer_hi = 35.0, 85.0
-        phb_lo, phb_hi = 30.0, 72.0
-        titer_note_s1 = "S1 base case is locked at 60 g/L; 35 g/L reproduces the v5/v6 conservative Year 1 case and >85 g/L should be treated as a stretch assumption."
-        titer_note_s2 = "S2 base case is locked at 60 g/L; values above ~85 g/L move into aggressive high-cell-density territory."
-        titer_stretch_threshold = 85.0
+    titer_lo, titer_hi = 35.0, 85.0
+    phb_lo, phb_hi = 30.0, 72.0
+    titer_note_s1 = "S1 base case is locked at 60 g/L; 35 g/L reproduces the v5/v6 conservative Year 1 case and >85 g/L should be treated as a stretch assumption."
+    titer_note_s2 = "S2 base case is locked at 60 g/L; values above ~85 g/L move into aggressive high-cell-density territory."
+    titer_stretch_threshold = 85.0
 
     _check("S1 CDW titer (g/L)", s1_inputs.get("titer_gL", 0.0), titer_lo, titer_hi, titer_note_s1)
     _check("S2 CDW titer (g/L)", s2_inputs.get("titer_gL", 0.0), titer_lo, titer_hi, titer_note_s2)
@@ -3234,14 +3215,10 @@ def _fairfield_guardrail_warnings(
     s1_titer = s1_inputs.get("titer_gL", 0.0)
     s2_titer = s2_inputs.get("titer_gL", 0.0)
     if s1_titer > titer_stretch_threshold or s2_titer > titer_stretch_threshold:
-        if operating_mode == "fed_batch":
-            warnings.append(
-                f"Fed-batch endpoint CDW above {titer_stretch_threshold:g} g/L is allowed for exploration "
-                "(Ryu 1997 reports 281 g/L with phosphate-limited feed), but should be treated as a stretch "
-                "case; OTR retrofit CapEx should usually be non-zero at this titer."
-            )
-        else:
-            warnings.append("Titer above 85 g/L is allowed for exploration, but should be treated as speculative unless you have process-specific supporting data.")
+        warnings.append(
+            "Titer above 85 g/L is allowed for exploration, but should be treated as speculative "
+            "unless you have process-specific supporting data."
+        )
     if market_inputs["npv_years"] > 15:
         warnings.append("NPV / IRR horizon above 15 years is beyond the original Fairfield 10-year framing and should be treated as a financing sensitivity, not the base case.")
 
@@ -3505,7 +3482,7 @@ def fig_v9_s1_s2_across_phases(
             y_max_all = max(s1_vals.max(), s2_vals.max())
             ax.set_ylim(0, y_max_all * 1.18)
 
-    mode_tag = "continuous 60 g/L CDW base case" if operating_mode == "continuous" else "fed-batch 150 g/L CDW base case"
+    mode_tag = "continuous fermentation (sidebar titer / PHB)"
     prod_tag = f"PHBV @ {phbv_hv_mol_pct:.0f}% HV" if phbv_enabled else "PHB base case"
     dsp_tag = f"DSP: {dsp_pathway_label}" if dsp_pathway_label else ""
     subtitle_bits = [f"S1 vs S2 across phases ({mode_tag}, ${scp_target_price:.2f}/kg SCP, {prod_tag})"]
@@ -4371,7 +4348,7 @@ V5_FIGURE_FORMULAS: Dict[str, str] = {
         "produce identical PHA and SCP tonnage (top-line revenue is identical). S1 and S2 differ only on the "
         "cost side: S2 has higher nitrogen reduction and higher carbon recovery but pays a DLP pretreatment "
         "step and a galactose-uptake penalty on the DLP fraction. The panel titles and subtitle reflect the "
-        "currently selected SCP price, DSP pathway, operating mode, and PHBV setting."
+        "currently selected SCP price, DSP pathway, and PHBV setting."
     ),
     "NPV vs Selling Price": (
         "This figure holds the selected phase fixed and sweeps only the PHA selling price.\n\n"
@@ -4489,13 +4466,12 @@ _require_app_password()
 st.title("Leatherback Fairfield TEA Dashboard v10")
 st.caption(
     "Dedicated Fairfield dashboard | AB InBev Fairfield brewery | "
-    "Continuous OR fed-batch mode | "
+    "Continuous fermentation (24 h HRT, 85% uptime) | "
     "DSP pathway selector (NaOCl / NaOH / Mechanical+enzymatic) | "
     "PHBV co-production toggle | "
     "Human-grade SCP toggle (v10) with co-production and HGP-alone sub-modes | "
     "Scenarios 1 and 2 | NCIMB 11599 | "
-    "Continuous base: 60 g/L, 24 h HRT, 85% uptime | "
-    "Fed-batch base: 150 g/L, 68% PHB, 76 h cycle, 68% duty cycle"
+    "Base case: 60 g/L CDW, 60% PHB (sidebar-adjustable)"
 )
 
 _sb_hdr("Focus View")
@@ -4547,99 +4523,8 @@ added_major_capex = (
     ) * 1e6
 )
 
-# ── v8 OPERATING MODE TOGGLE ─────────────────────────────────────────────────
-_sb_hdr("Operating Mode (v8)")
-st.sidebar.caption(
-    "Global switch. Drives both S1 and S2 simultaneously so the scenario "
-    "comparison always runs in the same fermentation regime."
-)
-operating_mode_label = st.sidebar.radio(
-    "Fermentation mode",
-    options=["Continuous (v7 base)", "Fed-batch (v8)"],
-    index=0,
-    key="v8_mode",
-    help=(
-        "Continuous: 24 h HRT, 85 % uptime, 60 g/L steady-state CDW. "
-        "Fed-batch: cycle time + duty cycle, high-density endpoint CDW. "
-        "Fed-batch defaults are anchored to Kim 1994 (121 g/L glucose "
-        "fed-batch, 76 % PHB), Ryu 1997 (281 g/L P-limited fed-batch, "
-        "67 % PHB), and Budde 2011 (engineered R. eutropha fed-batch "
-        "scale-up in commercial vessels)."
-    ),
-)
-operating_mode = "fed_batch" if "Fed-batch" in operating_mode_label else "continuous"
-
-if operating_mode == "fed_batch":
-    st.sidebar.caption(
-        "Fed-batch mode active. S1 and S2 scenario titer and PHB content "
-        "sliders are overridden by the global fed-batch values below so the "
-        "two scenarios remain directly comparable."
-    )
-    fed_batch_cdw = st.sidebar.slider(
-        "Fed-batch endpoint CDW (g/L)",
-        60.0, 250.0, FED_BATCH_CDW_GL_DEFAULT, 5.0,
-        key="v8_fb_cdw",
-        help=(
-            "Endpoint cell-dry-weight titer at harvest. Literature band: "
-            "Kim 1994 = 121 g/L (glucose fed-batch, pH-stat). "
-            "Ryu 1997 = 281 g/L (phosphate-limited, high-OTR). "
-            "Budde 2011 = 100-160 g/L at commercial scale. "
-            "Default 150 g/L is mid-range, CMO-achievable."
-        ),
-    )
-    fed_batch_phb_pct = st.sidebar.slider(
-        "Fed-batch PHB content (% CDW)",
-        40.0, 80.0, FED_BATCH_PHB_FRAC_DEFAULT * 100.0, 1.0,
-        key="v8_fb_phb",
-        help=(
-            "Intracellular PHB mass fraction at harvest under N-limited "
-            "fed-batch. Kim 1994 = 76 %. Ryu 1997 = 67 %. Default 68 % "
-            "is the Ryu mid-range."
-        ),
-    ) / 100.0
-    fed_batch_cycle_h = st.sidebar.slider(
-        "Fed-batch cycle time (h)",
-        36.0, 120.0, FED_BATCH_CYCLE_H_DEFAULT, 2.0,
-        key="v8_fb_cycle",
-        help=(
-            "Total cycle = CIP + SIP + fill + inoculate + lag + growth phase + "
-            "N-limitation / production phase + harvest. Literature range "
-            "48-96 h for C. necator glucose fed-batch at 50-250 kL scale."
-        ),
-    )
-    fed_batch_duty_pct = st.sidebar.slider(
-        "Fed-batch duty cycle (%)",
-        40.0, 85.0, FED_BATCH_DUTY_FRAC_DEFAULT * 100.0, 1.0,
-        key="v8_fb_duty",
-        help=(
-            "Fraction of calendar time the vessel is actively in a production "
-            "cycle (as opposed to changeover, maintenance, or idle). "
-            "Commercial fed-batch PHA plants typically run 60-75 %. "
-            "The continuous-mode analogue is the 85 % uptime assumption."
-        ),
-    ) / 100.0
-    fed_batch_otr_retrofit_M = st.sidebar.slider(
-        "OTR retrofit CapEx ($M, fed-batch only)",
-        0.0, 15.0, FED_BATCH_OTR_RETROFIT_M_DEFAULT, 0.25,
-        format="$%.2fM",
-        key="v8_fb_otr",
-        help=(
-            "Capital to retrofit the brewery vessels for high-density "
-            "fed-batch: upgraded impellers, sparger, motor, and possibly "
-            "cooling. Default $0 is the conservative 'lease-only' case. "
-            "Expected range for a 306 kL Phase III retrofit is "
-            "$4-12M (Rushton/Intermig dual-impeller swap, new ring sparger, "
-            "VFD motor upgrade, installation). Use this slider to stress-"
-            "test the fed-batch case with realistic retrofit CapEx."
-        ),
-    )
-    fed_batch_otr_retrofit = fed_batch_otr_retrofit_M * 1e6
-else:
-    fed_batch_cdw = FED_BATCH_CDW_GL_DEFAULT
-    fed_batch_phb_pct = FED_BATCH_PHB_FRAC_DEFAULT
-    fed_batch_cycle_h = FED_BATCH_CYCLE_H_DEFAULT
-    fed_batch_duty_pct = FED_BATCH_DUTY_FRAC_DEFAULT
-    fed_batch_otr_retrofit = 0.0
+# Continuous fermentation only (fed-batch UI removed).
+operating_mode = "continuous"
 
 _sb_hdr("Scenario 1 Inputs")
 st.sidebar.caption(
@@ -4982,23 +4867,10 @@ scenario_overrides = {
         "dlp_pretreat_cost": dlp_pretreat_cost,
     },
 }
-# In fed-batch mode the per-scenario titer / PHB sliders are superseded by
-# the global fed-batch defaults. Overwrite the per-scenario values so the
-# downstream merge, the guardrail function, and the display panels all see
-# the same fed-batch titer / PHB that the engine uses.
-if operating_mode == "fed_batch":
-    for sid in ("S1", "S2"):
-        scenario_overrides[sid]["titer_gL"] = float(fed_batch_cdw)
-        scenario_overrides[sid]["phb_content_frac"] = float(fed_batch_phb_pct)
-    s1_titer_eff = float(fed_batch_cdw)
-    s2_titer_eff = float(fed_batch_cdw)
-    s1_phb_eff = float(fed_batch_phb_pct)
-    s2_phb_eff = float(fed_batch_phb_pct)
-else:
-    s1_titer_eff = s1_titer
-    s2_titer_eff = s2_titer
-    s1_phb_eff = s1_phb
-    s2_phb_eff = s2_phb
+s1_titer_eff = s1_titer
+s2_titer_eff = s2_titer
+s1_phb_eff = s1_phb
+s2_phb_eff = s2_phb
 
 # v10: HGP-alone mode forces PHB content to a basal level in the engine.
 # Mirror that override into scenario_overrides so the guardrail check and
@@ -5022,11 +4894,11 @@ common_overrides = {
     "scp_credit_price": scp_credit_price,
     "discount_rate": discount_rate,
     "npv_years": float(npv_years),
-    # v8 operating-mode pass-through
+    # Operating-mode pass-through (UI is continuous-only; defaults retained for engine compatibility)
     "operating_mode": operating_mode,
-    "cycle_h": fed_batch_cycle_h,
-    "duty_cycle_frac": fed_batch_duty_pct,
-    "otr_retrofit_capex": fed_batch_otr_retrofit,
+    "cycle_h": FED_BATCH_CYCLE_H_DEFAULT,
+    "duty_cycle_frac": FED_BATCH_DUTY_FRAC_DEFAULT,
+    "otr_retrofit_capex": 0.0,
     # v9 DSP pathway pass-through
     "dsp_pathway_id": dsp_pathway_id,
     # v9 PHBV co-production pass-through
@@ -5045,13 +4917,6 @@ common_overrides = {
     "hgp_cp_frac": float(hgp_cp_frac),
     "hgp_alone_phb_frac": float(hgp_alone_phb_frac),
 }
-# In fed-batch mode the global CDW / PHB values override the per-scenario
-# slider values so S1 and S2 share an identical fed-batch product slate. The
-# scenario-specific cost-side biology (n_reduction_frac, carbon_recovery_frac,
-# yield, feed mix) is still honored per scenario.
-if operating_mode == "fed_batch":
-    common_overrides["titer_gL"] = float(fed_batch_cdw)
-    common_overrides["phb_content_frac"] = float(fed_batch_phb_pct)
 pha_blended_price = common_overrides["pha_blended_price"]
 base_overrides_by_scenario = {
     scenario_id: {
@@ -5165,18 +5030,7 @@ with st.expander("Fairfield Facility + Scenario Basis", expanded=True):
                 f"<div style='line-height:1.7;'>"
                 f"<div><strong>Facility:</strong> Former AB InBev brewery, 3101 Busch Drive, Fairfield CA</div>"
                 f"<div><strong>Installed phases:</strong> 50,000 L / 150,000 L / 400,000 L</div>"
-                f"<div><strong>Mode:</strong> "
-                + (
-                    "Continuous, 24 h HRT, 85% uptime"
-                    if operating_mode == "continuous"
-                    else (
-                        f"Fed-batch, {fed_batch_cycle_h:.0f} h cycle, "
-                        f"{fed_batch_duty_pct*100:.0f}% duty cycle, "
-                        f"{fed_batch_cdw:.0f} g/L endpoint CDW, "
-                        f"{fed_batch_phb_pct*100:.0f}% PHB"
-                    )
-                )
-                + "</div>"
+                f"<div><strong>Mode:</strong> Continuous, 24 h HRT, 85% uptime</div>"
                 f"<div><strong>Electricity:</strong> ${electricity_price:.3f}/kWh</div>"
                 f"<div><strong>Strain:</strong> C. necator NCIMB 11599</div>"
                 f"<div><strong>Acquisition:</strong> ${acquisition_cost/1e6:.1f}M</div>"
@@ -5249,24 +5103,12 @@ st.caption(
     f"Detailed view is currently centered on `{focus_phase}` / `{focus_scenario_id}`. "
     "All phases and both modeled scenarios are still calculated in the table and multi-case figures below."
 )
-if focus.operating_mode == "fed_batch":
-    _focus_turnovers = _annual_operating_cycles(
-        "fed_batch", focus.cycle_h, focus.duty_cycle_frac
-    )
-    st.caption(
-        f"Throughput basis (fed-batch): {focus.vessel_volume_L:,.0f} L installed × "
-        f"{focus.utilization_pct:.0f}% utilization = {focus.active_volume_L:,.0f} L "
-        f"utilized broth volume; annual CDW uses {_focus_turnovers:.1f} fed-batch "
-        f"cycles/year ({focus.cycle_h:.0f} h cycle × {focus.duty_cycle_frac*100:.0f}% "
-        f"duty cycle) at {focus.titer_gL:.0f} g/L endpoint CDW."
-    )
-else:
-    st.caption(
-        f"Throughput basis (continuous): {focus.vessel_volume_L:,.0f} L installed × "
-        f"{focus.utilization_pct:.0f}% utilization = {focus.active_volume_L:,.0f} L "
-        f"utilized broth volume; annual CDW uses {_annual_operating_cycles():.2f} "
-        f"operating turnover-equivalents/year (24 h HRT with 85% uptime)."
-    )
+st.caption(
+    f"Throughput basis (continuous): {focus.vessel_volume_L:,.0f} L installed × "
+    f"{focus.utilization_pct:.0f}% utilization = {focus.active_volume_L:,.0f} L "
+    f"utilized broth volume; annual CDW uses {_annual_operating_cycles():.2f} "
+    f"operating turnover-equivalents/year (24 h HRT with 85% uptime)."
+)
 c1, c2, c3, c4, c5, c6 = st.columns(6)
 c1.metric("Scenario", focus.scenario_id)
 c2.metric("Phase", focus.phase)
@@ -5300,44 +5142,16 @@ st.warning(
     "Open data item: Jelly Belly COD sugar composition is still estimated from published confectionary formulas. "
     "The feedstock sensitivity figure applies a ±20% band to feedstock + pretreatment cost to reflect that uncertainty."
 )
-if operating_mode == "fed_batch":
-    _fb_turnovers = _annual_operating_cycles(
-        "fed_batch", fed_batch_cycle_h, fed_batch_duty_pct
-    )
-    st.info(
-        f"**Fed-batch throughput (v8).** Annual CDW = utilized broth volume × "
-        f"endpoint titer × annual cycles, where annual cycles = "
-        f"{_fb_turnovers:.1f} = 8,760 h/year × {fed_batch_duty_pct*100:.0f}% duty "
-        f"cycle ÷ {fed_batch_cycle_h:.0f} h cycle time. At the v8 fed-batch base "
-        f"({fed_batch_cdw:.0f} g/L, {fed_batch_phb_pct*100:.0f}% PHB), Phase III "
-        f"S1 at 90% utilization produces "
-        f"{(PHASE_VOLUMES_L['Phase III']*0.90*fed_batch_cdw/1000.0*_fb_turnovers)/1000.0:,.0f} "
-        f"t/y CDW. Duty cycle already bakes in CIP, SIP, fill, inoculation, lag, "
-        f"growth, N-limitation, and harvest downtime. SCP tonnage in fed-batch "
-        f"mode uses the same residual-biomass math as continuous; see the note "
-        f"on SCP protein content below."
-    )
-    st.warning(
-        "**SCP caveat in fed-batch mode.** Strong N-limitation (what drives PHB "
-        "from 60% toward 68-76%) lowers the crude-protein fraction of the "
-        "residual non-PHB biomass from ~65% CP (continuous) to ~40-50% CP "
-        "(fed-batch). The v8 revenue line does not auto-derate the SCP selling "
-        "price for this; the SCP tonnage and price are identical to continuous "
-        "mode by construction. This is conservative on the direction of the "
-        "error (it slightly overstates fed-batch SCP revenue per ton of residual "
-        "biomass). Flagged for treatment in the v8 memo."
-    )
-else:
-    st.info(
-        "Annual throughput uses the continuous roll-up: utilized broth volume × titer × "
-        "(8,760 h/year × 85% uptime ÷ 24 h HRT). At the v7/v8 locked 60 g/L continuous "
-        "base case, Phase III S1 at 90% utilization gives ~6,701 t/y CDW. At the v5/v6 "
-        "35 g/L conservative case, the same configuration gives ~3,909 t/y CDW. "
-        "The site handoff (Fairfield_TEA_v7_Final.pdf, page 7) states ~10,700 t/y "
-        "for the 35 g/L case, which does not match its own formula "
-        "(306,000 L × 35 g/L × 8,760/24 ÷ 1e6 = 3,909 t/y). The v8 TEA does not "
-        "inherit that defect because it computes CDW from first principles."
-    )
+st.info(
+    "Annual throughput uses the continuous roll-up: utilized broth volume × titer × "
+    "(8,760 h/year × 85% uptime ÷ 24 h HRT). At the v7/v8 locked 60 g/L continuous "
+    "base case, Phase III S1 at 90% utilization gives ~6,701 t/y CDW. At the v5/v6 "
+    "35 g/L conservative case, the same configuration gives ~3,909 t/y CDW. "
+    "The site handoff (Fairfield_TEA_v7_Final.pdf, page 7) states ~10,700 t/y "
+    "for the 35 g/L case, which does not match its own formula "
+    "(306,000 L × 35 g/L × 8,760/24 ÷ 1e6 = 3,909 t/y). The v8 TEA does not "
+    "inherit that defect because it computes CDW from first principles."
+)
 
 _section("Phase + Scenario Table")
 rows = _fairfield_rows(results)
@@ -5476,10 +5290,10 @@ st.markdown("- `Fairfield_TEA_v7_Final.pdf`: primary locked Fairfield handoff us
 st.markdown("- [Orita et al. 2012](https://doi.org/10.1016/j.jbiosc.2011.09.010): NCIMB 11599 glucose-utilizing phenotype and equivalence to H16 on fructose.")
 st.markdown("- [PubMed 40669633](https://pubmed.ncbi.nlm.nih.gov/40669633/): retained as prior-session support for dairy-side feedstock framing where the new handoff did not fully override it.")
 st.markdown("- [NREL electrolysis overview](https://www.nrel.gov/hydrogen/electrolysis.html): retained as historical v4 reference only; **not used in v5 economics** because Fairfield excludes H2/CO2 fermentation and electrolyzer CapEx.")
-st.markdown("- **v8 fed-batch anchors:**")
-st.markdown("  - [Kim et al. 1994 — Biotechnol. Bioeng. 43(9):892-898](https://doi.org/10.1002/bit.260430908): glucose fed-batch of _A. eutrophus_ with on-line glucose control; 121 g/L CDW, 76% PHB. Anchor for the fed-batch PHB content default.")
-st.markdown("  - [Ryu et al. 1997 — Biotechnol. Bioeng. 55(1):28-32](https://doi.org/10.1002/(SICI)1097-0290(19970705)55:1%3C28::AID-BIT4%3E3.0.CO;2-Z): phosphate-limited fed-batch of _A. eutrophus_; 281 g/L CDW, 232 g/L PHB. Upper bound of the fed-batch CDW slider range.")
-st.markdown("  - [Budde et al. 2011 — Appl. Environ. Microbiol. 77(9):2847-2854](https://doi.org/10.1128/AEM.02429-10): engineered _R. eutropha_ P(HB-co-HHx) fed-batch at lab and pilot scale; demonstrates 100-160 g/L / 60-70% PHB is reproducible at commercial-scale vessels. Scale-up anchor for the v8 fed-batch base case (150 g/L, 68% PHB, 76 h cycle, 68% duty).")
+st.markdown("- **High-cell-density literature (Kim / Ryu / Budde):**")
+st.markdown("  - [Kim et al. 1994 — Biotechnol. Bioeng. 43(9):892-898](https://doi.org/10.1002/bit.260430908): glucose fed-batch of _A. eutrophus_ with on-line glucose control; 121 g/L CDW, 76% PHB.")
+st.markdown("  - [Ryu et al. 1997 — Biotechnol. Bioeng. 55(1):28-32](https://doi.org/10.1002/(SICI)1097-0290(19970705)55:1%3C28::AID-BIT4%3E3.0.CO;2-Z): phosphate-limited fed-batch of _A. eutrophus_; 281 g/L CDW, 232 g/L PHB.")
+st.markdown("  - [Budde et al. 2011 — Appl. Environ. Microbiol. 77(9):2847-2854](https://doi.org/10.1128/AEM.02429-10): engineered _R. eutropha_ P(HB-co-HHx) fed-batch at lab and pilot scale; 100-160 g/L / 60-70% PHB at pilot to commercial vessel scale.")
 st.markdown("- Existing v4 / source-model assumptions are used only where the Fairfield handoff did not provide a more specific value.")
 
 with st.expander("Scenario 3 narrative only"):
@@ -5506,11 +5320,6 @@ sidebar_snapshot = {
     "discount_rate": discount_rate,
     "npv_years": npv_years,
     "operating_mode": operating_mode,
-    "fed_batch_cdw_gL": fed_batch_cdw,
-    "fed_batch_phb_frac": round(fed_batch_phb_pct, 3),
-    "fed_batch_cycle_h": fed_batch_cycle_h,
-    "fed_batch_duty_frac": round(fed_batch_duty_pct, 3),
-    "fed_batch_otr_retrofit_musd": round(fed_batch_otr_retrofit / 1e6, 3),
     # v9 DSP + PHBV snapshot
     "dsp_pathway_id": dsp_pathway_id,
     "dsp_pathway_label": DSP_PATHWAYS[dsp_pathway_id]["label"],
@@ -5533,14 +5342,8 @@ sidebar_snapshot = {
 render_v5_chat(results, focus_phase, focus_scenario_id, sidebar_snapshot)
 
 st.caption(
-    "Leatherback Fairfield TEA Dashboard v8 — dedicated Fairfield-only dashboard built on "
-    "the current TEA workflow, with fixed phase volumes and scenario-locked assumptions. "
-    "v8 extends v7 by adding a global fermentation-mode toggle: continuous (v7 base: "
-    "60 g/L, 24 h HRT, 85% uptime) or fed-batch (default: 150 g/L endpoint CDW, 68% PHB, "
-    "76 h cycle, 68% duty cycle, literature-anchored to Kim 1994, Ryu 1997, and Budde "
-    "2011). The SCP market-price default remains \\$2.00/kg (fishmeal / FeedKind / "
-    "UniProtein 2024-2025 benchmarks) with a slider range of \\$0.30-\\$8.00/kg. In "
-    "fed-batch mode, an OTR-retrofit CapEx slider is exposed (default \\$0; typical "
-    "brewery-vessel retrofit lands \\$4-12M). The human-grade-protein scenario explored "
-    "in v6 is not carried into v8 — the modeled scope is the SCP+PHA biorefinery (S1, S2) only."
+    "Leatherback Fairfield TEA Dashboard v10 — Fairfield-only continuous fermentation model "
+    "with fixed phase volumes, S1/S2 feedstock scenarios, v9 DSP pathways, optional PHBV "
+    "co-production, and v10 human-grade protein (HGP). SCP market default \\$2.00/kg "
+    "(fishmeal / FeedKind / UniProtein benchmarks), slider \\$0.30-\\$8.00/kg."
 )
