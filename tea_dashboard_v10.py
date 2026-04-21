@@ -851,12 +851,12 @@ REFERENCE_LIBRARY: Dict[str, Dict[str, str]] = {
         "url_note": "",
     },
     "dalsasso_2019": {
-        "title": "Dalsasso et al. 2019 -- molasses PHB",
+        "title": "Dalsasso RR, Pavan FA, Bordignon SE, de Aragão GMF, Poletto P. 2019, Process Biochemistry 85:12-18 -- Polyhydroxybutyrate (PHB) production by Cupriavidus necator from sugarcane vinasse and molasses as mixed substrate",
         "kind": "Literature",
-        "why": "Molasses-based PHA performance and conservative titer framing (11.7 g/L PHB).",
-        "used": "Used specifically for the conservative molasses PHB titer framing around 11.7 g/L PHB, and more generally for molasses-based PHA plausibility.",
-        "url": "https://doi.org/10.3389/fbioe.2022.946085",
-        "url_note": "Links to Frontiers review covering Dalsasso-type molasses data. Confirm the exact ResearchGate source with your team.",
+        "why": "Peer-reviewed experimental study reporting PHB production by C. necator DSM 545 on sugarcane molasses + vinasse as a mixed substrate. Reports 11.7 g/L PHB, 56% PHB content of CDW, mu_max 0.36/h, and PHB productivity 0.42 g/L/h, which are the direct empirical basis for the conservative molasses titer framing.",
+        "used": "Used specifically for the conservative molasses PHB titer framing around 11.7 g/L PHB and 56% PHB content, and more generally for molasses-based PHA plausibility.",
+        "url": "https://doi.org/10.1016/j.procbio.2019.07.007",
+        "url_note": "DOI corrected from an earlier entry that pointed to a Frontiers review citing Dalsasso rather than to the original Process Biochemistry paper.",
     },
     "ishizaki_2001": {
         "title": "Ishizaki et al. (closest verified: Tanaka & Ishizaki 1995)",
@@ -914,14 +914,6 @@ REFERENCE_LIBRARY: Dict[str, Dict[str, str]] = {
         "url": "https://doi.org/10.1128/AEM.02429-10",
         "url_note": "",
     },
-    "plasmid_2025": {
-        "title": "DOI 10.1016/j.plasmid.2025.102765",
-        "kind": "Literature",
-        "why": "Sucrose / related substrate performance reference for optimized PHA framing.",
-        "used": "Used qualitatively for optimized sugar/substrate PHA performance framing; no single fixed scalar is copied directly from this paper.",
-        "url": "https://doi.org/10.1016/j.plasmid.2025.102765",
-        "url_note": "",
-    },
     "kapritchkoff_2006": {
         "title": "Kapritchkoff, Viotti, Alli, Zuccolo, Pradella, Maiorano, Miranda & Bonomi 2006, J. Biotechnol. 122(4):453-462 — Enzymatic recovery and purification of polyhydroxybutyrate produced by Ralstonia eutropha",
         "kind": "Literature",
@@ -931,7 +923,7 @@ REFERENCE_LIBRARY: Dict[str, Dict[str, str]] = {
         "url_note": "Replaces an earlier incorrect citation to Kessler & Witholt 2001, which covers PHA regulatory metabolism rather than downstream recovery.",
     },
     "hahn_1994": {
-        "title": "Hahn, Chang, Chang & Lee 1994, Biotechnol. Bioeng. 44(2):256-261 — Communication to the editor: Optimization of microbial poly(3-hydroxybutyrate) recovery using dispersions of sodium hypochlorite solution and chloroform",
+        "title": "Hahn SK, Chang YK, Kim BS, Chang HN. 1994, Biotechnol. Bioeng. 44(2):256-261 — Communication to the editor: Optimization of microbial poly(3-hydroxybutyrate) recovery using dispersions of sodium hypochlorite solution and chloroform",
         "kind": "Literature",
         "why": "Benchmarks alkaline digestion (NaOH-based) versus hypochlorite and solvent recovery for PHB. Reports reagent consumption, Mw retention, and extraction yield trade-offs that anchor the NaOH hot-alkali pathway defaults.",
         "used": "v9 anchor for the NaOH hot-alkali DSP pathway defaults ($0.45/kg PHA extraction, $0.38/kg CDW downstream, $1.5M Phase III CapEx adder for alkali-resistant wetted parts).",
@@ -1109,7 +1101,7 @@ def scenario_reference_ids(model_key: str, r: Any, assumption_kwargs: Dict[str, 
     ids = ["framework_2026", "imarc_ammonium_2025"]
     if model_key in {"pha", "bio"}:
         ids.extend([
-            "kim_1994", "ryu_1997", "budde_2011", "plasmid_2025",
+            "kim_1994", "ryu_1997", "budde_2011",
             "kapritchkoff_2006", "hahn_1994", "jacquel_2008",
             "doi_1988", "madison_huisman_1999", "tianan_kaneka_2024",
         ])
