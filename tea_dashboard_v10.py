@@ -834,6 +834,22 @@ REFERENCE_LIBRARY: Dict[str, Dict[str, str]] = {
         "url": "",
         "url_note": "Internal / confidential document.",
     },
+    "fairfield_handoff_v7": {
+        "title": "Leatherback Systems, Inc. -- Fairfield Biofoundry Site-Specific Technoeconomic Analysis (Fairfield_TEA_v7_Final, April 5, 2026)",
+        "kind": "Internal / confidential site handoff",
+        "why": "Primary locked handoff document for the Fairfield Biofoundry. Prepared jointly by Leatherback Systems (Thomas Grimm, Founder/CEO; MJ Zeng, Co-Founder) and Dr. Justin Panich (Exponential Phase LLC). Defines the full Scenario 1 (Jelly Belly COD + invertase) and Scenario 2 (Jelly Belly COD + delactosed permeate, DLP) parameter set, including feedstock costs, pretreatment costs, utilities, nitrogen, labor ramp, and the confirmed AB InBev brewery PPA electricity rate. The document is the single authoritative source for all cost inputs marked CONFIRMED in Table 19 (Section 5.3 -- Parameters for Dr. Justin Panich -- Final Formal Inputs) and for the per-run OPEX cost build in Table 11 (Section 3 -- Per-Run OPEX, All Three Phases, Scenario 1).",
+        "used": "All cost-side inputs in the v10 engine were back-calculated from the Scenario 1 per-run OPEX table in the handoff so that the engine reproduces the handoff cost structure at Phase III (14,000 kg CDW/day basis). Specifically: Jelly Belly COD at $0.11/kg fermentable sugar; Scenario 1 pretreatment at $0.038/kg sugar (invertase $0.015 + pH adjust $0.004 + filtration $0.007 + HTST $0.012); DLP at $0.12-0.13/kg sugar with DLP pretreatment at pH + dilution only (taken as $0.004/kg sugar); electricity at $0.12/kWh, sourced from the AB InBev Fairfield PPA and confirmed by Thomas Grimm (vs the California industrial average of approximately $0.19/kWh); electricity intensity implied at ~1.77 kWh/kg CDW; steam $0.160/kg CDW; bulk downstream $0.420/kg CDW; CIP $0.177/kg CDW; PHA extraction $0.638/kg sellable PHA; nitrogen at a standard cost of $0.068/kg CDW with a 50% reduction in Scenario 1 and ~75% blended reduction in Scenario 2 driven by gelatin-amino-acid nitrogen in the Jelly Belly COD and the near-zero native nitrogen content of DLP; fixed labor at $0.45M, $1.10M, and $2.00M for Phases I / II / III respectively (25% / 60% / 100% FTE ramp); and a discount rate of 9%. Continuous operation with 24-hour HRT is the handoff-confirmed base case; fed-batch is explicitly excluded. Upside / downside are limited to plus or minus 20% CDW titer only, per the handoff instruction.",
+        "url": "",
+        "url_note": "Confidential internal document (Fairfield_TEA_v7_Final). All cost inputs in the v10 engine trace to this source; where the handoff referenced a peer-reviewed paper (e.g. Orita 2012 for glucose utilisation by NCIMB 11599, Wang et al. 2022 for DLP pricing), that paper is also cited in the reference library as a supporting external anchor.",
+    },
+    "phycovax_costs_davis": {
+        "title": "PhycoVax Inc. -- Leatherback BioHub Techno-Economic Analysis: Sugar Feedstocks vs. Dairy Waste Streams (Helen Wahlgren, Director of Business Development, PhycoVax Inc., March 27, 2026)",
+        "kind": "Internal / confidential DLP feedstock memo",
+        "why": "Companion memo prepared for the Berkeley Labs collaboration review (CEO Thomas Grimm, Chief Scientist Dr. Roshan Shrestha). Independent internal verification of the DLP-from-Hilmar feedstock price at $0.13/kg lactose equivalent (Table 9, cross-referenced against Wang et al. 2022 Processes 10:17), and of the broader Central Valley dairy-waste feedstock pricing landscape (whey permeate $0.37/kg, whey sugar / lactose powder $0.77/kg, HFCS $0.38-0.45/kg, corn dextrose $0.585/kg, US sugar beet $0.50-0.56/kg).",
+        "used": "Used to cross-check the DLP sugar price band in the Fairfield handoff. The PhycoVax memo's $0.13/kg anchor sits inside the Fairfield handoff $0.12-0.13/kg band; the v10 engine uses the midpoint $0.125/kg, which is consistent with both internal sources.",
+        "url": "",
+        "url_note": "Confidential internal document (PhycoVax_costs_davis). Feedstock cost inputs are cross-referenced with this memo; dark-fermentation and IRA 45V content is outside the Fairfield SCP/PHA scope and is not used by the v10 engine.",
+    },
     "wang_2022": {
         "title": "Wang K, Hobby AM, Chen Y, Chio A, Jenkins BM, Zhang R. 2022, Processes 10(1):17 -- Techno-economic analysis on an industrial-scale production system of polyhydroxyalkanoates (PHA) from cheese by-products by halophiles",
         "kind": "Literature / TEA",
@@ -1098,7 +1114,12 @@ def scenario_label(model_key: str, r: Any) -> str:
 
 
 def scenario_reference_ids(model_key: str, r: Any, assumption_kwargs: Dict[str, Any], defaults: Any) -> List[str]:
-    ids = ["framework_2026", "imarc_ammonium_2025"]
+    ids = [
+        "framework_2026",
+        "fairfield_handoff_v7",
+        "phycovax_costs_davis",
+        "imarc_ammonium_2025",
+    ]
     if model_key in {"pha", "bio"}:
         ids.extend([
             "kim_1994", "ryu_1997", "budde_2011",
