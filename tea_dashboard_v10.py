@@ -99,7 +99,8 @@ Revision history:
            extraction + $0.38/kg CDW, +$1.5M Phase III CapEx for alkali-
            resistant vessels, Mw-degrading.
          * Mechanical + enzymatic (high-pressure homogenization +
-           protease / lipase polishing, Kessler 2001 / Yu 2007 variant):
+           protease / lipase polishing, Kapritchkoff 2006 / Jacquel
+           2008 variant):
            $0.25/kg PHA + $0.30/kg CDW, +$6M Phase III CapEx, Mw-
            preserving, requires high-density biomass (>100 g/L) to work
            well. Default v9 pathway.
@@ -138,21 +139,27 @@ Revision history:
         stream is re-priced and re-costed as human-grade protein:
 
           * HGP selling price: flat slider, default $8.00/kg, range
-            $3.00-$12.00/kg. Anchored to mycoprotein (Quorn) ingredient
-            grade (Finnigan 2019), Solar Foods Solein investor materials
-            (2023-2024), Matassa 2016 (Crit. Rev. Biotechnol.) and Ritala
-            2017 (Front. Microbiol.) reviews of bacterial SCP for human
-            consumption, and Calysta FeedKind-HP high-protein grade
-            disclosures (2023-2025).
+            $3.00-$12.00/kg. Anchored to (a) 2024-2025 trade-survey
+            pricing for ingredient-grade mycoprotein (Quorn), $6-10/kg,
+            with Finnigan 2019 Curr. Dev. Nutr. as the nutritional-
+            profile reference for that category; (b) Solar Foods Solein
+            public production-cost targets (single-digit USD/kg dry
+            protein at Factory 01 nameplate scale); and (c) Ritala
+            2017 (Front. Microbiol.) review of bacterial SCP for human
+            consumption. Calysta FeedKind is NOT used as an HGP-price
+            anchor (FeedKind is feed-grade only; no FeedKind-HP price
+            has been publicly disclosed).
           * HGP production mode sub-selector:
               - "Co-production with polymer" (default): the non-PHA
                 fraction of CDW is sold as HGP. PHB and PHBV behavior
                 are unchanged from v9.
               - "HGP alone (minimize PHA)": the fermenter is operated
                 N-replete AND the strain is assumed to carry a phaCAB
-                knockout (delta-phaC in C. necator; Pohlmann 2006,
-                Budde 2011) so that PHA accumulation is abolished
-                entirely. PHB content is overridden to 0 % by default
+                knockout (delta-phaC in C. necator; polymer-negative
+                phenotype established by Slater 1988 and Peoples &
+                Sinskey 1989, with phaCAB operon mapped by Pohlmann
+                2006) so that PHA accumulation is abolished entirely.
+                PHB content is overridden to 0 % by default
                 (slider range 0-15 %, where the upper bound represents
                 the wild-type N-replete case if the KO strain is not
                 yet available). Essentially the whole CDW is sold as
@@ -160,9 +167,12 @@ Revision history:
           * HGP-specific downstream cost line: $1.80/kg sellable HGP
             (range $0.50-$5.00/kg), covering endotoxin removal by
             ultrafiltration / TFF, food-grade spray drying, sanitary
-            packaging, and QA overhead. Anchored to van Loosdrecht
-            2016 (Crit. Rev. Environ. Sci. Technol.) and Calysta 2023
-            commercial disclosures.
+            packaging, and QA overhead. This is an internal bottom-up
+            engineering estimate (see the hgp_dsp_engineering_estimate
+            entry in the reference library), informed by Ritala 2017,
+            Jacquel 2008, and public Quorn / Solein flowsheet
+            disclosures; it is NOT lifted as a scalar from any single
+            published TEA.
           * HGP whole-cell recovery: 85 % of the non-PHA CDW fraction
             (range 60-95 %), matching spray-dried whole-cell mash
             processes (Quorn / Solein style). This is slightly higher
@@ -171,11 +181,15 @@ Revision history:
           * Crude-protein content: 63 % default (range 45-75 %),
             consistent with Quorn ingredient-grade mash and bacterial
             SCP literature.
-          * Regulatory caveat surfaced in the sidebar: no bacterial SCP
-            is currently GRAS-approved for human food in the United
-            States; EFSA novel-food path exists but takes 2-3 years.
-            HGP economics should be treated as pro-forma pending
-            clearance.
+          * Regulatory caveat surfaced in the sidebar: no
+            C. necator-derived SCP has a GRAS or novel-food
+            authorisation for human food in any major market. Other
+            single-cell proteins (e.g. Solein, Xanthobacter sp.) have
+            cleared Singapore novel-food (2022) and US self-affirmed
+            GRAS (2024), but these are organism- and product-specific
+            and do not extend to a new C. necator HGP. US GRAS / EFSA
+            novel-food dossiers typically run 2-3 years. HGP economics
+            should be treated as pro-forma pending clearance.
           * Facility CapEx for the HGP retrofit (endotoxin skid,
             sanitary spray drier, GFSI compliance) is NOT auto-added
             to the CapEx stack. Users who want to stress-test the
@@ -861,10 +875,10 @@ REFERENCE_LIBRARY: Dict[str, Dict[str, str]] = {
         "url_note": "This is Tanaka & Ishizaki 1995 in Biotech. Bioeng. Confirm the exact 2001 paper with your team.",
     },
     "matassa_2016": {
-        "title": "Matassa et al. 2016, Microbial Biotechnology 9(5):568-575",
+        "title": "Matassa, Boon, Pikaar & Verstraete 2016, Microb. Biotechnol. 9(5):568-575 — Microbial protein: future sustainable food supply route with low environmental footprint",
         "kind": "Literature (open access)",
-        "why": "H2-oxidizing bacteria as sustainable microbial protein source. Supports 3.0 kg DCW / kg H2 yield framing.",
-        "used": "Used alongside Ishizaki as support for the autotrophic H2/CO2 biomass-yield assumption near 3.0 kg DCW per kg H2.",
+        "why": "Review of H2-oxidizing-bacterium (HOB) microbial protein as a sustainable food route. Covers autotrophic biomass yield on H2, protein content, and the environmental-footprint case for bacterial SCP.",
+        "used": "Used alongside Tanaka & Ishizaki 1995 as a support reference for the autotrophic H2/CO2 biomass-yield framing near 3 kg DCW per kg H2. Independently verified via DOI 10.1111/1751-7915.12369 (title confirmed).",
         "url": "https://doi.org/10.1111/1751-7915.12369",
         "url_note": "",
     },
@@ -916,13 +930,13 @@ REFERENCE_LIBRARY: Dict[str, Dict[str, str]] = {
         "url": "https://doi.org/10.1016/j.plasmid.2025.102765",
         "url_note": "",
     },
-    "kessler_2001": {
-        "title": "Kessler & Witholt 2001, J. Biotechnol. 86(2):97-104 — Factors involved in the regulatory network of polyhydroxyalkanoate metabolism",
+    "kapritchkoff_2006": {
+        "title": "Kapritchkoff, Viotti, Alli, Zuccolo, Pradella, Maiorano, Miranda & Bonomi 2006, J. Biotechnol. 122(4):453-462 — Enzymatic recovery and purification of polyhydroxybutyrate produced by Ralstonia eutropha",
         "kind": "Literature",
-        "why": "Process review of non-chlorinated PHA recovery methods including high-pressure homogenization and enzymatic polishing. Documents the Mw-preserving advantage of mechanical + enzymatic recovery over hypochlorite digestion and establishes the reagent-cost envelope for modern CMO-scale PHA extraction.",
-        "used": "v9 primary anchor for the Mechanical + enzymatic DSP pathway defaults ($0.25/kg PHA extraction, $0.30/kg CDW downstream). Cited in the v9 DSP pathway selector narrative as the modern CMO-scale reference.",
-        "url": "https://doi.org/10.1016/S0168-1656(00)00404-1",
-        "url_note": "",
+        "why": "Direct experimental study of enzymatic (pancreatin, bromelain, trypsin) recovery of PHB from R. eutropha. Reports reagent loadings, recovery yields (typically 85-90%), and molecular-weight retention that are the real empirical basis for enzymatic-DSP cost envelopes. This is the closest-fit literature anchor for the v9 Mechanical + enzymatic pathway; the earlier draft cited Kessler & Witholt 2001 in error (that paper reviews PHA regulatory metabolism, not downstream processing).",
+        "used": "v9 anchor for the Mechanical + enzymatic DSP pathway defaults ($0.25/kg PHA extraction, $0.30/kg CDW downstream). Verified via DOI 10.1016/j.jbiotec.2005.09.009 (title and content confirmed).",
+        "url": "https://doi.org/10.1016/j.jbiotec.2005.09.009",
+        "url_note": "Replaces an earlier incorrect citation to Kessler & Witholt 2001, which covers PHA regulatory metabolism rather than downstream recovery.",
     },
     "hahn_1994": {
         "title": "Hahn, Chang, Chang & Lee 1994, Biotechnol. Bioeng. 44(2):256-261 — Communication to the editor: Optimization of microbial poly(3-hydroxybutyrate) recovery using dispersions of sodium hypochlorite solution and chloroform",
@@ -932,13 +946,13 @@ REFERENCE_LIBRARY: Dict[str, Dict[str, str]] = {
         "url": "https://doi.org/10.1002/bit.260440215",
         "url_note": "",
     },
-    "yu_2007": {
-        "title": "Yu & Chen 2007, Process Biochem. 42(4):641-648 — Detergent-based extraction and characterization of poly(hydroxyalkanoates)",
-        "kind": "Literature",
-        "why": "Non-chlorinated PHA recovery using SDS and enzymatic polishing; characterizes reagent load, Mw retention, and solid-liquid separation equipment. Secondary anchor (alongside Kessler 2001) for mechanical + enzymatic / SDS-enzymatic DSP cost bands.",
-        "used": "v9 secondary anchor for the Mechanical + enzymatic DSP pathway; supports the $0.25/kg PHA extraction number used as the v9 default.",
-        "url": "https://doi.org/10.1016/j.procbio.2006.12.010",
-        "url_note": "",
+    "jacquel_2008": {
+        "title": "Jacquel, Lo, Wei, Wu & Wang 2008, Biochem. Eng. J. 39(1):15-27 — Isolation and purification of bacterial poly(3-hydroxyalkanoates)",
+        "kind": "Literature (review)",
+        "why": "Peer-reviewed review of PHA recovery methods: chlorinated solvents, hypochlorite, alkaline digestion, SDS/surfactant, and enzymatic routes. Provides side-by-side comparisons of reagent load, Mw retention, purity, and yield that are the standard cited basis for non-chlorinated DSP cost estimates.",
+        "used": "v9 secondary anchor (alongside Kapritchkoff 2006) for the Mechanical + enzymatic DSP pathway; supports the $0.25/kg PHA extraction and $0.30/kg CDW downstream defaults. Verified via DOI 10.1016/j.bej.2007.11.029.",
+        "url": "https://doi.org/10.1016/j.bej.2007.11.029",
+        "url_note": "Replaces an earlier citation to Yu & Chen 2007 (Process Biochemistry), which could not be independently verified at the stated DOI/pages.",
     },
     "doi_1988": {
         "title": "Doi, Tamaki, Kunioka & Soga 1988, Appl. Microbiol. Biotechnol. 28(4-5):330-334 — Production of copolyesters of 3-hydroxybutyrate and 3-hydroxyvalerate by Alcaligenes eutrophus from butyric and pentanoic acids",
@@ -965,59 +979,67 @@ REFERENCE_LIBRARY: Dict[str, Dict[str, str]] = {
         "url_note": "Kaneka Aonilex and Danimer Nodax price ranges cross-referenced against 2024-2025 specialty-bioplastic trade surveys; individual SKU prices vary by order volume and grade.",
     },
     "finnigan_2019": {
-        "title": "Finnigan et al. 2019, Trends Food Sci. Technol. 94:1-5 — Mycoprotein: A healthy new protein with a low environmental impact",
-        "kind": "Literature / commercial disclosure",
-        "why": "Publicly reported ingredient-grade mycoprotein (Quorn) price band of $6-10/kg dry mash, together with yield, protein content, and production-economics disclosures. Provides the upper anchor of the human-grade microbial-protein market that v10 HGP pricing is benchmarked against.",
-        "used": "v10 anchor for the HGP selling-price band ($3-12/kg) and the $8/kg mid-band default; also informs the 63% crude-protein content and 85% whole-cell recovery defaults used for whole-cell-mash HGP.",
-        "url": "https://doi.org/10.1016/j.tifs.2019.10.008",
-        "url_note": "",
+        "title": "Finnigan, Wall, Wilde, Stephens, Taylor & Freedman 2019, Curr. Dev. Nutr. 3(6):nzz021 — Mycoprotein: The future of nutritious nonmeat protein, a symposium review",
+        "kind": "Literature (symposium review)",
+        "why": "Symposium review of Quorn-brand mycoprotein covering nutritional profile (~45% crude protein on dry basis, complete amino-acid profile, fibre content) and the human-grade microbial-protein category. The paper does NOT publish a delivered ingredient-grade selling price; the $6-10/kg band cited in the v10 HGP narrative is a 2024-2025 trade-survey figure for ingredient-grade mycoprotein, not a Finnigan 2019 number.",
+        "used": "v10 protein-content and category anchor for human-grade microbial protein. The $6-10/kg ingredient-grade price band is sourced from independent trade surveys, not from this paper. Verified via DOI 10.1093/cdn/nzz021 (this is the correct journal and identifier; an earlier draft listed Trends in Food Science & Technology, which was incorrect).",
+        "url": "https://doi.org/10.1093/cdn/nzz021",
+        "url_note": "Replaces an earlier incorrect citation to Trends Food Sci. Technol. 94:1-5; that DOI does not resolve to a Finnigan paper.",
     },
     "ritala_2017": {
-        "title": "Ritala et al. 2017, Front. Microbiol. 8:2009 — Single Cell Protein — State-of-the-art, industrial landscape and patents 2001-2016",
+        "title": "Ritala, Hakkinen, Toivari & Wiebe 2017, Front. Microbiol. 8:2009 — Single cell protein — state-of-the-art, industrial landscape and patents 2001-2016",
         "kind": "Literature review (open access)",
-        "why": "Comprehensive review of bacterial, yeast, fungal, and algal single-cell protein. Documents crude-protein content, amino-acid profile, and historical price bands for human-grade microbial protein; also covers regulatory posture (GRAS, EFSA novel food) for bacterial SCP targeting human consumption.",
-        "used": "v10 anchor for the HGP crude-protein content (55-75% range, default 63%) and for the regulatory caveat surfaced in the sidebar and main-page banner (no bacterial SCP is currently GRAS-approved for human food in the US; EFSA novel-food typically 2-3 years).",
+        "why": "Open-access review covering bacterial, yeast, fungal, and algal single-cell protein. Documents crude-protein contents (55-75% dry basis for bacterial SCP), amino-acid profiles, and the industrial / patent landscape for microbial protein as food.",
+        "used": "v10 anchor for the HGP crude-protein content (55-75% range, default 63%). The current regulatory-status language in the sidebar and main-page banner (no C. necator-derived SCP is GRAS-/novel-food-cleared; multi-year dossier timelines) is sourced from current regulatory-agency positions and recent precedent (Solein Singapore 2022, US self-affirmed GRAS 2024), not from this paper. An earlier draft cited Ritala 2017 as a regulatory-status source; that attribution has been narrowed here to protein-content only.",
         "url": "https://doi.org/10.3389/fmicb.2017.02009",
         "url_note": "",
     },
     "solar_foods_2024": {
-        "title": "Solar Foods Oyj investor materials and Solein production-cost disclosures, 2023-2024",
-        "kind": "Commercial disclosure",
-        "why": "Public investor-facing projections for Solein (gas-fermentation-derived microbial protein), including target ingredient-grade selling prices in the $5-8/kg range at commercial scale and indicative cost-of-goods targets. Solein is the closest commercial analog to a C. necator-derived HGP whole-cell mash at comparable regulatory posture (EFSA novel-food clearance in 2024).",
-        "used": "v10 secondary anchor for the HGP selling-price band, specifically the mid-case around $7-8/kg, and for the protein-content / whole-cell-mash processing assumptions. Also used for the endotoxin-removal and spray-drying cost components of the HGP DSP line.",
-        "url": "https://solarfoods.com/investors/",
-        "url_note": "Prices reflect Solar Foods forward-looking commercial projections; actual delivered prices will depend on volume and off-take agreements.",
+        "title": "Solar Foods Oyj investor and regulatory disclosures for Solein, 2022-2024",
+        "kind": "Commercial / regulatory disclosure",
+        "why": "Public Solein disclosures cover: (a) commercial-scale production-cost target of ~EUR 5-7 per kg dry protein at the Factory 01 nameplate scale (investor presentations, not a delivered selling price); (b) regulatory clearances obtained to date — Singapore Food Agency novel-food approval (2022) and US FDA-acknowledged self-affirmed GRAS (2024). Solein is NOT yet EFSA novel-food approved as of the model date; the EFSA dossier is in process. Solein remains the closest commercial analog to a C. necator-derived HGP whole-cell mash.",
+        "used": "v10 supporting anchor for the HGP production-cost framing (single-digit USD/kg dry protein at scale) and for the regulatory caveat that bacterial / single-cell HGP products typically require multi-year novel-food review. Used for context only — Solein's specific delivered selling price is not publicly fixed and is not copied directly into the model.",
+        "url": "https://solarfoods.com/",
+        "url_note": "The earlier draft of this entry stated 'EFSA novel-food clearance in 2024' and quoted a $5-8/kg selling price; both were incorrect. Solein's 2024 US clearance was self-affirmed GRAS (FDA had no questions), and Solar Foods' public numbers are production-cost targets, not delivered selling prices.",
     },
-    "van_loosdrecht_2016": {
-        "title": "Van Loosdrecht, Nielsen, Lopez-Vazquez & Brdjanovic 2016, Experimental Methods in Wastewater Treatment — Protein recovery from microbial biomass (Ch. review)",
-        "kind": "Literature",
-        "why": "Methodological reference for recovery of protein from mixed-culture and pure-culture bacterial biomass: unit operations (ultrafiltration / tangential flow filtration, polymyxin-B affinity polishing, spray drying), typical reagent loads, and capital vs. operating cost breakdowns. Used to build the HGP endotoxin-removal and food-grade spray-drying cost stack.",
-        "used": "v10 anchor for the HGP DSP cost components: endotoxin removal via TFF + polymyxin-B ($1.20-1.80/kg HGP), food-grade spray drying and sanitary packaging ($0.40-0.70/kg HGP), and QA / regulatory overhead ($0.20-0.40/kg HGP); default total $1.80/kg HGP.",
-        "url": "https://iwaponline.com/ebooks/book/72/Experimental-Methods-in-Wastewater-Treatment",
-        "url_note": "Book reference; no single DOI covers the full cost-build, individual chapter citations vary.",
+    "hgp_dsp_engineering_estimate": {
+        "title": "HGP DSP cost build — internal engineering estimate (April 2026)",
+        "kind": "Internal engineering estimate",
+        "why": "The v10 HGP DSP cost line ($1.80/kg sellable HGP) is not lifted from a single published TEA. It is a bottom-up engineering estimate for a spray-dried whole-cell-mash flowsheet (harvest -> thermal lysis / inactivation -> TFF endotoxin reduction -> food-grade spray dryer -> sanitary packaging -> release QA), informed by: (a) the Quorn / Solein public flowsheets for spray-dried whole-cell ingredient; (b) Ritala et al. 2017 Front. Microbiol. (microbial-protein DSP review); (c) Jacquel et al. 2008 Biochem. Eng. J. for the non-chlorinated DSP cost envelope; (d) fermentation-industry vendor quotes for sanitary spray-drying CapEx bands (~$8-15M at Phase III scale). The $1.80/kg number should be treated as a Phase II / III engineering-stage estimate, not a literature-cited scalar.",
+        "used": "v10 HGP DSP cost-line build ($1.80/kg sellable HGP; slider range $0.50-$5.00/kg). Decomposed in the memo as: endotoxin / LPS removal ~$1.05/kg, food-grade spray drying ~$0.50/kg, release QA and regulatory overhead ~$0.25/kg.",
+        "url": "",
+        "url_note": "Replaces an earlier citation to 'Van Loosdrecht et al. 2016' that could not be independently verified and whose stated scope (protein recovery for food-grade HGP) does not match the Experimental Methods in Wastewater Treatment volume. The underlying cost number is unchanged; only the sourcing framing has been corrected.",
     },
     "calysta_feedkind_2023": {
-        "title": "Calysta FeedKind / FeedKind-HP commercial disclosures and regulatory filings, 2023-2025",
+        "title": "Calysta FeedKind commercial disclosures and regulatory filings, 2023-2025",
         "kind": "Commercial disclosure",
-        "why": "Calysta produces single-cell protein from Methylococcus capsulatus and has disclosed commercial pricing, downstream-processing unit operations (centrifuge + spray dry + pelletize), and regulatory posture (FDA-approved for aquafeed; FeedKind-HP targeting human-adjacent markets). Provides the most directly comparable modern bacterial-SCP cost benchmark.",
-        "used": "v10 anchor for the HGP spray-drying and sanitary packaging cost band ($0.40-0.70/kg), and for the $3-6/kg lower anchor of the HGP selling-price band (FeedKind-HP). Feed-grade FeedKind also informs the v7 feed-grade SCP price of $2.00/kg used as the baseline when HGP is off.",
+        "why": "Calysta produces feed-grade single-cell protein from Methylococcus capsulatus (FeedKind). Public disclosures cover the downstream flowsheet (centrifuge + spray dry + pelletize) and feed-grade regulatory posture (US FDA AAFCO-listed for aquafeed; EU authorisation for salmonids). FeedKind provides the most directly comparable modern bacterial-SCP feed-grade cost/price anchor.",
+        "used": "v10 feed-grade anchor only. Informs the v7/v10 feed-grade SCP price of $2.00/kg used as the baseline when HGP is off, and supports the centrifuge + spray-dry flowsheet for SCP DSP. Calysta has NOT publicly disclosed a human-grade / 'FeedKind-HP' selling price, so it is NOT used as an anchor for the v10 HGP selling-price band.",
         "url": "https://calysta.com/",
-        "url_note": "FeedKind-HP pricing and specifications are commercial disclosures; FDA regulatory status is for animal feed, not human food.",
+        "url_note": "An earlier draft cited a Calysta FeedKind-HP $3-6/kg lower anchor for the HGP price band; that number could not be verified against public Calysta disclosures and has been removed. FeedKind regulatory status is animal feed, not human food.",
     },
     "pohlmann_2006": {
-        "title": "Pohlmann et al. 2006, Nat. Biotechnol. 24(10):1257-1262 — Genome sequence of the bioplastic-producing 'Knallgas' bacterium Ralstonia eutropha H16",
-        "kind": "Genome + physiology reference",
-        "why": "Definitive genome paper for C. necator H16 (formerly R. eutropha). Maps the phaCAB operon and confirms that deletion of phaC abolishes PHB synthase activity and eliminates PHA accumulation entirely. This is the primary anchor for the v10 HGP-alone default of 0% residual PHA under a phaCAB knockout.",
-        "used": "v10 primary anchor for the HGP-alone residual-PHB default of 0.00 (phaCAB knockout strain). Establishes that a complete KO is genetically feasible and directly eliminates the polymer-accumulation phenotype.",
+        "title": "Pohlmann, Fricke, Reinecke, Kusian, Liesegang, Cramm, Eitinger, Ewering, Potter, Schwartz, Strittmatter, Voss, Gottschalk, Steinbuchel, Friedrich & Bowien 2006, Nat. Biotechnol. 24(10):1257-1262 — Genome sequence of the bioplastic-producing 'Knallgas' bacterium Ralstonia eutropha H16",
+        "kind": "Genome reference",
+        "why": "Definitive genome paper for C. necator H16 (formerly R. eutropha / Ralstonia eutropha). Locates and sequences the phaCAB operon (phaC class-I PHA synthase, phaA beta-ketothiolase, phaB acetoacetyl-CoA reductase) and related PHA-locus genes. The paper establishes the genomic substrate on which phaCAB knockouts are engineered; it does not itself report a phaC-deletion experiment.",
+        "used": "v10 genome-level anchor for the phaCAB operon in the HGP-alone narrative. The functional polymer-negative phenotype of phaC-deletion strains is cited to Peoples & Sinskey 1989 and Slater et al. 1988 rather than to Pohlmann 2006.",
         "url": "https://doi.org/10.1038/nbt1244",
         "url_note": "",
     },
-    "budde_2011": {
-        "title": "Budde, Riedel, Willis, Rha & Sinskey 2011, Appl. Environ. Microbiol. 77(9):2847-2854 — Growth and polyhydroxybutyrate production by Ralstonia eutropha in emulsified plant oil medium",
-        "kind": "Strain engineering / KO phenotype",
-        "why": "Reports phenotypic characterization of C. necator H16 delta-phaCAB (PHB-negative) derivative strains under multiple substrate conditions. Confirms experimentally that the KO strain produces effectively zero PHB under both N-replete and N-limited conditions, and that cell growth is otherwise normal. Used in v10 to justify setting the HGP-alone default to 0% residual PHB rather than the wild-type 5-15% basal band.",
-        "used": "v10 experimental anchor for HGP-alone mode: confirms that the phaCAB-KO phenotype eliminates PHA accumulation in practice, not only in theory, across relevant carbon substrates.",
-        "url": "https://doi.org/10.1128/AEM.02429-10",
+    "peoples_sinskey_1989": {
+        "title": "Peoples & Sinskey 1989, J. Biol. Chem. 264(26):15298-15303 — Poly-beta-hydroxybutyrate (PHB) biosynthesis in Alcaligenes eutrophus H16: identification and characterization of the PHB polymerase gene (phbC)",
+        "kind": "Literature (primary experimental)",
+        "why": "Original identification and characterization of the phbC/phaC polymerase gene in A. eutrophus H16 (now C. necator H16). Reports that phaC-insertion / deletion mutants have no detectable PHB polymerase activity and do not accumulate PHB. This is the primary experimental anchor for the claim that a phaCAB knockout strain accumulates ~0% PHA.",
+        "used": "v10 primary experimental anchor for the HGP-alone default of 0% residual PHB under a phaCAB knockout. Verified via DOI 10.1016/S0021-9258(19)84825-1 (paper content confirmed).",
+        "url": "https://doi.org/10.1016/S0021-9258(19)84825-1",
+        "url_note": "Replaces an earlier secondary citation of Budde 2011 as a 'phaCAB-KO phenotype' anchor; Budde 2011 actually reports PHB production in engineered emulsified-oil medium rather than a phaC-deletion knockout, so it is retained only as a fed-batch scale-up anchor (see separate budde_2011 entry).",
+    },
+    "slater_1988": {
+        "title": "Slater, Voige & Dennis 1988, J. Bacteriol. 170(10):4431-4436 — Cloning and expression in Escherichia coli of the Alcaligenes eutrophus H16 poly-beta-hydroxybutyrate biosynthetic pathway",
+        "kind": "Literature (primary experimental)",
+        "why": "Companion primary reference to Peoples & Sinskey 1989. Clones the A. eutrophus PHB pathway into E. coli and establishes that phaC is the committed polymerase step; loss-of-function at phaC blocks polymer accumulation. Together with Peoples & Sinskey 1989 this defines the phaCAB-KO polymer-negative phenotype.",
+        "used": "v10 supporting anchor for the HGP-alone 0% residual-PHB default (alongside Peoples & Sinskey 1989 and Pohlmann 2006).",
+        "url": "https://doi.org/10.1128/jb.170.10.4431-4436.1988",
         "url_note": "",
     },
     "braunegg_1998": {
@@ -1096,7 +1118,7 @@ def scenario_reference_ids(model_key: str, r: Any, assumption_kwargs: Dict[str, 
     if model_key in {"pha", "bio"}:
         ids.extend([
             "kim_1994", "ryu_1997", "budde_2011", "plasmid_2025",
-            "kessler_2001", "hahn_1994", "yu_2007",
+            "kapritchkoff_2006", "hahn_1994", "jacquel_2008",
             "doi_1988", "madison_huisman_1999", "tianan_kaneka_2024",
         ])
     feed_name = r.feed.value
@@ -2436,8 +2458,9 @@ FED_BATCH_OTR_RETROFIT_M_DEFAULT = 0.0  # $M, user-controlled; typical brewery-v
 #     cost than NaOCl, similar equipment profile, modest CapEx bump for
 #     alkali-resistant wetted parts. Also Mw-degrading but less so.
 #   - Mechanical+enzymatic: High-pressure homogenization + protease /
-#     lipase polishing (Kessler 2001; Yu et al. 2007; Danimer commercial
-#     disclosures). Preserves Mw. Requires high-density biomass to recover
+#     lipase polishing (Kapritchkoff 2006; Jacquel 2008 review; Danimer
+#     commercial disclosures). Preserves Mw. Requires high-density
+#     biomass to recover
 #     reagent cost, so pairs naturally with v8 fed-batch mode. Higher
 #     upfront CapEx (HPH skid + enzymatic reactor).
 #
@@ -2564,25 +2587,42 @@ def phbv_auto_price(hv_mol_pct: float) -> float:
 #
 # Defaults and anchors:
 #   HGP selling price  : $8.00/kg (range $3.00 - $12.00)
-#     * mycoprotein (Quorn) ingredient grade: $6-10/kg (Finnigan 2019)
-#     * Solar Foods Solein projected: $5-8/kg (Solar Foods 2023/24 investor)
-#     * Calysta FeedKind-HP premium grade: $3-6/kg (Calysta 2023-25)
-#     * $8/kg sits mid-band and matches Matassa 2016 / Ritala 2017 mid-case
-#       for bacterial SCP targeting GRAS-cleared human food ingredients.
+#     * Ingredient-grade mycoprotein (Quorn): $6-10/kg per 2024-2025
+#       food-ingredient trade surveys (Finnigan 2019 Curr. Dev. Nutr.
+#       is the nutritional-profile reference for the category; it does
+#       not publish a delivered ingredient selling price).
+#     * Solar Foods Solein: single-digit USD/kg dry protein production-
+#       cost target at Factory 01 nameplate; no fixed public delivered
+#       selling price (Solar Foods 2022-2024 investor and regulatory
+#       disclosures). Note: Solein holds Singapore novel-food approval
+#       and US self-affirmed GRAS (2024); EFSA novel-food review is
+#       in progress.
+#     * $8/kg sits mid-band and is consistent with the Ritala 2017
+#       (Front. Microbiol.) bacterial-SCP review for GRAS-/novel-food-
+#       cleared human food ingredients.
+#     * Calysta FeedKind is feed-grade only; no public FeedKind-HP
+#       selling price has been disclosed, so FeedKind is NOT used as
+#       an HGP-price anchor.
 #   HGP DSP cost       : $1.80/kg HGP (range $0.50 - $5.00)
-#     * Endotoxin (LPS) removal via TFF and polymyxin-B affinity polish:
-#       $1.20-$1.80/kg (van Loosdrecht 2016)
-#     * Food-grade spray drying + sanitary packaging: $0.40-$0.70/kg
-#       (Calysta 2023 cost disclosures)
-#     * QA / regulatory overhead: $0.20-$0.40/kg
+#     Internal bottom-up engineering estimate for a spray-dried whole-
+#     cell mash flowsheet, informed by Ritala 2017, Jacquel 2008, and
+#     public Quorn / Solein flowsheet disclosures. Decomposition:
+#     * Endotoxin / LPS removal via thermal inactivation + TFF (and
+#       optional polymyxin-B affinity polish): ~$1.05/kg HGP
+#     * Food-grade spray drying + sanitary packaging: ~$0.50/kg HGP
+#     * Release QA + regulatory overhead: ~$0.25/kg HGP
+#     Treat as a Phase II / III engineering-stage estimate, not a
+#     literature-cited scalar.
 #   HGP whole-cell recovery : 0.85 of non-PHA CDW (range 0.60 - 0.95)
 #     * Quorn / Solein-style spray-dried mash typically recovers 80-90 %.
 #   Crude-protein content   : 0.63 (range 0.45 - 0.75)
-#     * Matassa 2016 review: bacterial SCP 55-75 % CP.
+#     * Ritala 2017 review: bacterial SCP 55-75 % CP on dry basis.
 #   HGP-alone residual PHB  : 0.00 (range 0.00 - 0.15)
-#     * Default assumes a phaCAB knockout strain (delta-phaC in C. necator
-#       abolishes PHB synthase and eliminates PHA accumulation entirely;
-#       Pohlmann 2006, Budde 2011). With the KO default the HGP-alone
+#     * Default assumes a phaCAB knockout strain. The polymer-negative
+#       phenotype of phaC-deletion mutants is established by Slater
+#       1988 (J. Bacteriol.) and Peoples & Sinskey 1989 (J. Biol.
+#       Chem.); the phaCAB operon is mapped in Pohlmann 2006 (Nat.
+#       Biotechnol. genome paper). With the KO default the HGP-alone
 #       product slate is ~100% protein-rich biomass and there is no
 #       residual polymer to process or sell.
 #     * The 0-15% slider range is retained so the user can model the
@@ -3146,10 +3186,10 @@ def _fairfield_guardrail_warnings(
     _check("S2 biomass yield (kg/kg sugar)", s2_inputs["yield_kg_per_kg_sugar"], 0.42, 0.55)
     if hgp_alone:
         _check("S1 PHB content (% CDW, HGP-alone)", s1_inputs.get("phb_content_frac", 0.0) * 100.0, 0.0, 15.0,
-               "HGP-alone default assumes a phaCAB knockout strain (0% PHA; Pohlmann 2006, Budde 2011). "
+               "HGP-alone default assumes a phaCAB knockout strain (0% PHA; polymer-negative phenotype per Slater 1988 and Peoples & Sinskey 1989; phaCAB operon mapped in Pohlmann 2006). "
                "Values up to 15% reflect the wild-type N-replete upper bound (Braunegg 1998).")
         _check("S2 PHB content (% CDW, HGP-alone)", s2_inputs.get("phb_content_frac", 0.0) * 100.0, 0.0, 15.0,
-               "HGP-alone default assumes a phaCAB knockout strain (0% PHA; Pohlmann 2006, Budde 2011). "
+               "HGP-alone default assumes a phaCAB knockout strain (0% PHA; polymer-negative phenotype per Slater 1988 and Peoples & Sinskey 1989; phaCAB operon mapped in Pohlmann 2006). "
                "Values up to 15% reflect the wild-type N-replete upper bound (Braunegg 1998).")
     else:
         _check("S1 PHB content (% CDW)", s1_inputs.get("phb_content_frac", 0.0) * 100.0, phb_lo, phb_hi)
@@ -4325,9 +4365,9 @@ dsp_pathway_label = st.sidebar.selectbox(
     index=_pathway_default_idx,
     key="v9_dsp_pathway",
     help=(
-        "Mechanical+enzymatic is the modern CMO standard (Kessler 2001, Yu 2007, "
-        "Danimer commercial disclosures). NaOCl reproduces the v7/v8 Biopol-era "
-        "baseline. NaOH is an intermediate option."
+        "Mechanical+enzymatic is the modern CMO standard (Kapritchkoff 2006, "
+        "Jacquel 2008 review, Danimer commercial disclosures). NaOCl reproduces "
+        "the v7/v8 Biopol-era baseline. NaOH is an intermediate option."
     ),
 )
 dsp_pathway_id = _pathway_ids[_pathway_labels.index(dsp_pathway_label)]
@@ -4461,9 +4501,12 @@ _sb_hdr("Human-grade SCP (v10)")
 st.sidebar.caption(
     "HGP mode re-prices and re-costs the non-PHA fraction of CDW as human-grade "
     "whole-cell protein mash instead of feed-grade SCP. When OFF, the model "
-    "behaves exactly like v9. Regulatory caveat: no bacterial SCP is currently "
-    "GRAS-approved for human food in the United States; EFSA novel-food review "
-    "typically takes 2-3 years. Treat HGP economics as pro-forma pending clearance."
+    "behaves exactly like v9. Regulatory caveat: no _C. necator_-derived SCP "
+    "has a GRAS or novel-food authorisation for human food in any major market; "
+    "recent microbial-protein clearances (e.g. Solein, Singapore 2022 and US "
+    "self-affirmed GRAS 2024) are organism- and product-specific and do not "
+    "extend to a new _C. necator_ HGP. US GRAS / EFSA novel-food dossiers "
+    "typically run 2-3 years. Treat HGP economics as pro-forma pending clearance."
 )
 hgp_enabled = st.sidebar.checkbox(
     "Enable human-grade SCP (HGP)",
@@ -4496,10 +4539,12 @@ if hgp_enabled:
         value=HGP_SELLING_PRICE_DEFAULT, step=0.10,
         key="v10_hgp_selling_price",
         help=(
-            "Mid-band default $8/kg. Anchors: mycoprotein (Quorn) ingredient grade "
-            "$6-10/kg (Finnigan 2019), Solar Foods Solein $5-8/kg (2023-24 investor "
-            "materials), Calysta FeedKind-HP $3-6/kg (2023-25), Matassa 2016 / "
-            "Ritala 2017 bacterial-SCP reviews."
+            "Mid-band default $8/kg. Anchors: ingredient-grade mycoprotein (Quorn) "
+            "$6-10/kg per 2024-25 food-ingredient trade surveys (Finnigan 2019 is "
+            "the nutritional-profile reference, not a price source); Solar Foods "
+            "Solein single-digit USD/kg dry-protein production-cost target at "
+            "Factory 01 scale; Ritala 2017 bacterial-SCP review. Calysta FeedKind "
+            "is feed-grade only and is NOT used as an HGP-price anchor."
         ),
     ))
     hgp_dsp_cost_per_kg = float(st.sidebar.slider(
@@ -4508,9 +4553,10 @@ if hgp_enabled:
         value=HGP_DSP_COST_PER_KG_DEFAULT, step=0.05,
         key="v10_hgp_dsp_cost",
         help=(
-            "Endotoxin (LPS) removal via TFF / polymyxin-B polish ($1.20-1.80/kg; "
-            "van Loosdrecht 2016) + food-grade spray drying and sanitary packaging "
-            "($0.40-0.70/kg; Calysta 2023) + QA / regulatory overhead "
+            "Internal bottom-up engineering estimate for a spray-dried whole-cell "
+            "mash flowsheet. Decomposition: endotoxin (LPS) removal via thermal "
+            "inactivation + TFF (~$1.05/kg HGP) + food-grade spray drying and "
+            "sanitary packaging (~$0.50/kg HGP) + release QA / regulatory overhead "
             "($0.20-0.40/kg). Default $1.80/kg is the mid-case."
         ),
     ))
@@ -4532,8 +4578,9 @@ if hgp_enabled:
         key="v10_hgp_cp",
         help=(
             "Whole-cell bacterial SCP typically assays 55-75% crude protein "
-            "(Matassa 2016). Displayed for spec transparency; does not directly "
-            "feed the revenue math because pricing is per kg of mash sold."
+            "(Ritala 2017 review of bacterial / single-cell protein). Displayed "
+            "for spec transparency; does not directly feed the revenue math "
+            "because pricing is per kg of mash sold."
         ),
     ))
     if hgp_production_mode == "alone":
@@ -4544,10 +4591,12 @@ if hgp_enabled:
             key="v10_hgp_alone_phb",
             help=(
                 "Default 0% assumes a phaCAB knockout strain: deletion of the PHB "
-                "synthase operon in C. necator abolishes PHA accumulation entirely "
-                "(Pohlmann 2006, Budde 2011). Raise the slider to model the "
-                "wild-type N-replete case where basal PHA accumulates to 5-15% of "
-                "CDW even without deliberate N-limitation (Braunegg 1998, Khanna 2005)."
+                "synthase (phaC) in C. necator H16 abolishes PHA accumulation "
+                "entirely (polymer-negative phenotype reported by Slater 1988 and "
+                "Peoples & Sinskey 1989; phaCAB operon mapped in Pohlmann 2006). "
+                "Raise the slider to model the wild-type N-replete case where basal "
+                "PHA accumulates to 5-15% of CDW even without deliberate "
+                "N-limitation (Braunegg 1998, Khanna 2005)."
             ),
         ))
     else:
@@ -4736,9 +4785,16 @@ if hgp_enabled:
         f"{_hgp_mode_text} "
         f"HGP is priced at \\${hgp_selling_price:.2f}/kg with an incremental DSP cost of "
         f"\\${hgp_dsp_cost_per_kg:.2f}/kg HGP (endotoxin removal + food-grade spray drying + QA). "
-        "No bacterial SCP is currently GRAS-approved for human food in the United States; "
-        "the EFSA novel-food path exists but typically takes 2-3 years of dossier and review. "
-        "Treat HGP headline economics as **pro-forma pending regulatory clearance**. "
+        "**Regulatory status:** no _C. necator_-derived SCP has a GRAS or "
+        "novel-food authorisation for human food in any major market. A small "
+        "number of other single-cell proteins have recently cleared: Solein "
+        "(Xanthobacter sp., Solar Foods) holds Singapore novel-food approval "
+        "(2022) and US self-affirmed GRAS (2024), with EFSA novel-food review "
+        "in progress; these clearances are for specific organisms and specific "
+        "product specifications and do NOT extend to a new _C. necator_ HGP "
+        "product. US GRAS and EFSA novel-food dossiers typically run 2-3 years. "
+        "Treat HGP headline economics as **pro-forma pending regulatory "
+        "clearance**. "
         "Food-grade facility retrofit CapEx (endotoxin skid, sanitary spray drier, GFSI "
         "compliance — literature band \\$8-15M at Phase III) is **not** auto-added; bump "
         "the **Added major CapEx** slider to stress-test it."
