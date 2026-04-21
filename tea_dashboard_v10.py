@@ -955,12 +955,12 @@ REFERENCE_LIBRARY: Dict[str, Dict[str, str]] = {
         "url_note": "",
     },
     "tianan_kaneka_2024": {
-        "title": "Tianan Biopolymer and Kaneka Corporation PHBV / PHBH product-line disclosures, 2023-2025",
-        "kind": "Commercial disclosure",
-        "why": "Publicly available specialty-bioplastic price ranges for PHBV (Tianan Enmat) and PHBH (Kaneka Aonilex) across HV/HHx content grades, plus Danimer Nodax third-party pricing surveys. Define the price-vs-HV slope used in the v9 auto-scaling PHBV price model.",
-        "used": "v9 anchors for the piecewise-linear PHBV auto-scaling price model: $5.50/kg at 5% HV, $7/kg at 10%, $9/kg at 15%, $12/kg at 20%.",
-        "url": "https://www.tianan-enmat.com/",
-        "url_note": "Kaneka Aonilex and Danimer Nodax price ranges cross-referenced against 2024-2025 specialty-bioplastic trade surveys; individual SKU prices vary by order volume and grade.",
+        "title": "Tianan Biologic Materials (Enmat) / Kaneka Corporation (Aonilex) / Danimer Scientific (Nodax) PHBV / PHBH product-line disclosures (2023-2025), with peer-reviewed anchor Rosenboom, Langer & Traverso 2022 Nat. Rev. Mater. 7:117-137",
+        "kind": "Commercial disclosure + peer-reviewed review",
+        "why": "Publicly verifiable specialty-bioplastic price ranges for PHBV (Tianan Enmat Y1000P at 1-2% HV) and PHBH (Kaneka Aonilex), plus Danimer Nodax third-party pricing surveys. The Helian Polymers authorized European distributor for Tianan lists Enmat Y1000P pellets at EUR 40/kg (10 kg tier) sliding to EUR 12.50/kg (250 kg tier) for powder, which cross-checks against the $6-8/kg commercial PHBV band used in the model. Rosenboom et al. 2022 is the peer-reviewed secondary anchor: their Nature Reviews Materials bioplastics market overview reports commercial PHA pellet pricing in the 2-8 USD/kg range and documents the PHBV premium over PHB.",
+        "used": "v9/v10 anchors for the piecewise-linear PHBV auto-scaling price model: $5.50/kg at 5% HV, $7/kg at 10%, $9/kg at 15%, $12/kg at 20%. The price-vs-HV slope reflects co-substrate cost and industrial-grade scarcity, not a single published price table.",
+        "url": "https://shop.helianpolymers.com/collections/tianan-biologic",
+        "url_note": "Earlier entry pointed to https://www.tianan-enmat.com/ which throws an SSL certificate warning in modern browsers and is not safe to cite in investor-facing deliverables. Replaced with the authorized European distributor (Helian Polymers) product page, which lists Enmat grades and public per-kg prices. The peer-reviewed Rosenboom 2022 Nat. Rev. Mater. anchor (DOI 10.1038/s41578-021-00407-8) is the preferred citation for the underlying commercial price band.",
     },
     "finnigan_2019": {
         "title": "Finnigan, Wall, Wilde, Stephens, Taylor & Freedman 2019, Curr. Dev. Nutr. 3(6):nzz021 — Mycoprotein: The future of nutritious nonmeat protein, a symposium review",
