@@ -3827,17 +3827,26 @@ def fig_v5_waterfall(
     stm = r.steam_cost / 1e6
     ext = r.extraction_cost / 1e6
     dwn = r.downstream_cost / 1e6
+    hgp = float(getattr(r, "hgp_dsp_cost", 0.0)) / 1e6
     cp = r.cip_cost / 1e6
     lab = r.labor_cost / 1e6
     cap = r.annual_major_capex / 1e6
     cf = r.annual_cash_flow / 1e6
-    values = [rv, -feed, -nit, -elec, -stm, -ext, -dwn, -cp, -lab, -cap, cf]
+    hgp_on = bool(getattr(r, "annual_hgp_kg", 0.0) > 0)
+    pha_on = bool(getattr(r, "annual_pha_kg", 0.0) > 0)
+    if hgp_on and pha_on:
+        rev_label = "Revenue\n(PHA+HGP)"
+    elif hgp_on:
+        rev_label = "Revenue\n(HGP)"
+    else:
+        rev_label = "Revenue\n(PHA+SCP)"
+    values = [rv, -feed, -nit, -elec, -stm, -ext, -dwn, -hgp, -cp, -lab, -cap, cf]
     labels = [
-        "Revenue\n(PHA+SCP)", "Feedstock &\npretreat", "Nitrogen",
-        "Electricity", "Steam", "Extraction", "Downstream",
-        "CIP / maint.", "Labor", "Annualized\nCapEx", "Cash\nflow",
+        rev_label, "Feedstock &\npretreat", "Nitrogen",
+        "Electricity", "Steam", "PHA\nextraction", "Downstream",
+        "HGP DSP", "CIP / maint.", "Labor", "Annualized\nCapEx", "Cash\nflow",
     ]
-    colors = ["#059669"] + ["#dc2626"] * 9 + ["#0369a1"]
+    colors = ["#059669"] + ["#dc2626"] * 10 + ["#0369a1"]
     starts: List[float] = []
     running = 0.0
     for v in values[:-1]:
